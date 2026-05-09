@@ -1,0 +1,37 @@
+# Compiled artifacts
+*.o
+*.d
+*.a
+*.so
+*.so.*
+
+# Python build artifacts
+*.pyc
+__pycache__/
+*.egg-info/
+build/
+dist/
+python/build/
+
+# Cython generated C++
+python/pyatnept.cpp
+
+# Simulation output data
+python/output-Neptune*/
+neptune/output-Neptune*/
+planet/output-Neptune*/
+
+# Executables
+cli/nept
+python/nept
+planet/nept
+
+# Reference papers (copyright)
+Reaction_Papers/
+
+# ODT and PDF documents
+*.odt
+*.pdf
+
+# Claude Code session data
+.claude/
