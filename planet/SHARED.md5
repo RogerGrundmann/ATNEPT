@@ -24,5 +24,6 @@ cb1c5d6d2a17ab71a3325c602833feb2  planet/ATPhys.h
 edf00eb9e4a480535cfd4d90339fa7ac  planet/FluxLimiter.h
 52a7a800875443e2f8f3ebfe9506c6cd  planet/ParaViewWriter.h
 fc8734f6d8e2579b3045af094f4b12b4  planet/PressureSolver.h
+035909ae5e2cb50eb682eb098761b782  planet/Radiation.h
 e3bc3b896bcdb7b778340db84e1b029c  planet/Reporting.h
 5643f3828886f0ae0935dec27d002a70  planet/SaturationAdjustment.h

@@ -12,6 +12,7 @@
 
 #include "cNeptuneModel.h"
 #include "ConvectiveAdjustmentNept.h"
+#include "RadiationNept.h"
 #include "PressureSolver.h"
 #include "BC_Nept.h"
 #include "ChemistryNept.h"
@@ -43,6 +44,22 @@ using namespace AtomUtils;
 // it is a physics comparison, not a refactor.
 static int press_solver_shared(){
     static const int v = [](){ const char* e = getenv("ATNEPT_PRESS_SOLVER"); return e ? atoi(e) : 0; }();
+    return v;
+}
+
+// Grey multi-layer radiation (RadiationNept), the SHARED Radiation<Planet> that ATSAT and ATJUP
+// already run. DEFAULT OFF, so every existing ATNEPT run stays byte-identical; ATNEPT_RADIATION=1
+// switches it on. It fills the DIAGNOSTIC arrays radiation / epsilon / Q_rad and touches neither t
+// nor any rhs — wiring the heating into the temperature equation is a separate step, as it was on
+// the other two models.
+//
+// Neptune is the hard case for this scheme. It absorbs ~1.07 W/m2 of sunlight (S=1.505, A=0.290)
+// against an internal flux of 0.433 W/m2, so nearly a third of its budget comes from below —
+// where Jupiter, which this scheme was calibrated on, is nearer half but at forty times the
+// absolute flux. Whether a grey scheme tuned there behaves at Neptune's temperatures is exactly
+// what switching this on is for, and is not established by adding it.
+static int radiation_enabled(){
+    static const int v = [](){ const char* e = getenv("ATNEPT_RADIATION"); return e ? atoi(e) : 0; }();
     return v;
 }
 
@@ -391,6 +408,7 @@ void cNeptuneModel::Run(){
 
         // After the state has been advanced and the boundaries applied: put any
         // superadiabatic column back on the dry adiabat. Off by default (ATNEPT_CONV_ADJ).
+        if(radiation_enabled()) RadiationNept(*this).run();
         if(conv_adj_enabled()) ConvectiveAdjustmentNept(*this).run();
 
         panorama_cnt++;
@@ -488,6 +506,9 @@ void cNeptuneModel::resetArrays(){
 
     thermalmassflux.initArray(im, jm, km, 0.0);   // thermal massflux_h2s
 
+    radiation.initArray(im, jm, km, 0.0);            // net thermal radiative flux [W/m2]
+    epsilon.initArray(im, jm, km, 0.0);              // layer emissivity
+    Q_rad.initArray(im, jm, km, 0.0);                // radiative heating rate [W/m3]
     p_dyn.initArray(im, jm, km, pa);                // dynamic pressure
     p_dynn.initArray(im, jm, km, pa);               // dynamic pressure, previous iteration
     p_stat.initArray(im, jm, km, pa);                // static pressure

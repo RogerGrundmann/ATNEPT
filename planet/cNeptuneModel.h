@@ -59,6 +59,7 @@ class cNeptuneModel{
     template<class M> friend class SaturationAdjustment;
     template<class M> friend class PressureSolver;
     template<class M> friend class Reporting;
+    template<class M> friend class Radiation;
     friend class BC_Nept;
     friend class ChemistryNept;
     friend class SaturationAdjustmentNept;
@@ -77,6 +78,39 @@ public:
     // shared header can say which planet it is running on without knowing anything else
     // about it. ATSAT and ATJUP carry the same accessor.
     static const char* planet_tag(){ return "ATNEPT"; }
+
+    /*
+     * ---- Neptune's radiative constants, for the SHARED Radiation.h ----
+     *
+     * MEASURED PROPERTIES OF NEPTUNE, which is why they live here and not in the shared file: a
+     * mechanical copy of Saturn's radiation would have produced Saturn's budget on Neptune's grid.
+     *
+     *                          ATJUP    ATSAT    ATNEPT   source
+     *   solar constant         50.5     14.83    1.505    1361/a^2, a = 5.20, 9.58, 30.07 AU
+     *   Bond albedo            0.343    0.342    0.290    Pearl & Conrath
+     *   intrinsic flux F_int   5.4      2.01     0.433    Pearl & Conrath 1991, 0.433 +/- 0.046
+     *   H2 mole fraction       0.86     0.96     0.80
+     *   He mole fraction       0.136    0.032    0.19
+     *
+     * Neptune is the extreme case of the set: it receives ~1/10 of Saturn's sunlight and ~1/34 of
+     * Jupiter's, yet radiates about 2.6x what it absorbs, so its INTERNAL flux dominates its budget
+     * far more than either. Whether this scheme, calibrated on Jupiter, behaves sensibly in that
+     * regime is exactly what the knob is for and is not established here.
+     */
+    static double rad_F_int()       { return 0.433; }  // Neptune intrinsic heat flux [W/m2]
+    static double rad_S_solar()     { return 1.505; }  // solar constant at 30.07 AU [W/m2]
+    static double rad_albedo_bond() { return 0.290; }  // Neptune Bond albedo (S*(1-A) is ABSORBED)
+    static double rad_x_H2()        { return 0.80;  }  // H2 mole fraction
+    static double rad_x_He()        { return 0.19;  }  // He mole fraction
+
+    // Physical thickness of layer i in metres, which the radiation integrates optical depth over.
+    double layer_thickness_m(int i){
+        if(i < 0 || i > im-2) return 0.0;
+        return (double)(m_layer_heights[i+1] - m_layer_heights[i]) * 1.0e3;
+    }
+
+    // Neptune has no surface: the column starts at i = 0 everywhere.
+    int surface_index(int, int) const { return 0; }
 
     // p_dyn is stored as the NONDIMENSIONAL kinematic pressure, so displaying it in bar needs
     // r_mix*u_0^2*1e-5. Default OFF (returns 1.0) so the printed number is unchanged; ATNEPT_PDYN_UNITS=1
@@ -777,6 +811,9 @@ private:
     Array cloudiness_h2s; // cloudiness, N in literature
     Array cloudiness_nh3; // cloudiness, N in literature
 
+    Array radiation;            // net thermal radiative flux [W/m2]
+    Array epsilon;              // layer emissivity
+    Array Q_rad;                // radiative heating rate [W/m3]
     Array p_dyn;                // dynamic pressure
     // Previous-iteration dynamic pressure, the n-copy of p_dyn. It did not exist at all
     // until steadyQuery was revived: the routine's pressure case was commented out, its
