@@ -106,6 +106,17 @@ public:
     static int bc_default_pole_copy(){ return 0; }
     static int bc_default_radius_copy(){ return 0; }
 
+    // Snapshot of the lid temperature, for the shared BoundaryConditions' lid-pin knob. It is
+    // DECLARED here and filled by the shared header itself, lazily, on the first call with the pin
+    // enabled — which is why there is no initialisation to write: with the knob off (Neptune's
+    // default, as on Saturn) it stays empty and costs one size() test per call.
+    //
+    // Worth knowing before anyone enables it: on ATSAT the pin was measured to be a cure for a
+    // drift that does not exist — the lid moved +0.077 K over 28 iterations — and, because the
+    // snapshot is taken during INITIALISATION, pinning holds a pre-first-iteration value rather
+    // than "where the lid would otherwise have been". Neptune's lid has not been measured at all.
+    std::vector<std::vector<double> > t_top_init;
+
     std::vector<Array*> bc_fields_radius();
     std::vector<Array*> bc_fields_theta_extrap();
     std::vector<Array*> bc_fields_theta_zero();
