@@ -54,6 +54,7 @@ class cNeptuneModel{
     // Shared physics/output templates (SHARED.md5, `make check-shared`). ATNEPT is the third
     // model to take these; see ParaViewWriter.h for what it provides and what it does not.
     template<class M> friend class ParaViewWriter;
+    template<class M> friend class ConvectiveAdjustment;
     friend class BC_Nept;
     friend class ChemistryNept;
     friend class SaturationAdjustmentNept;
@@ -68,6 +69,11 @@ public:
     // ("Radial_Data_Nept_Circulation"). ATNEPT carried both spellings by hand, and its
     // "has been written" line used the SHORT one — so it announced Nept_radial_20_1.vtk,
     // a file that does not exist. The shared writer names the file it actually wrote.
+    // The model's own name in log lines written by SHARED code — "ATNEPT: ..." — so a
+    // shared header can say which planet it is running on without knowing anything else
+    // about it. ATSAT and ATJUP carry the same accessor.
+    static const char* planet_tag(){ return "ATNEPT"; }
+
     static const char* planet_name(){ return "Neptune"; }
     static const char* planet_short(){ return "Nept"; }
 

@@ -11,6 +11,7 @@
 */
 
 #include "cNeptuneModel.h"
+#include "ConvectiveAdjustmentNept.h"
 #include "BC_Nept.h"
 #include "ChemistryNept.h"
 #include "PressureSolverNept.h"
@@ -20,6 +21,18 @@
 using namespace std;
 using namespace tinyxml2;
 using namespace AtomUtils;
+
+// Dry convective adjustment (ConvectiveAdjustmentNept), the SHARED ConvectiveAdjustment<Planet>
+// that ATSAT and ATJUP already run. DEFAULT OFF, so every existing ATNEPT run stays
+// bit-identical; ATNEPT_CONV_ADJ=1 switches it on. It restores any superadiabatic column to the
+// dry adiabat while conserving the column's mass-weighted enthalpy, and nothing else in this
+// model does that. Whether Neptune develops such columns at all is unmeasured — switching it on
+// and reading the per-iteration report (columns touched, layers mixed, max dT, enthalpy drift)
+// is how to find out. Same convention as every other ported module: gated, off, measured later.
+static int conv_adj_enabled(){
+    static const int v = [](){ const char* e = getenv("ATNEPT_CONV_ADJ"); return e ? atoi(e) : 0; }();
+    return v;
+}
 
 cNeptuneModel* cNeptuneModel::m_model = NULL;
 
@@ -345,6 +358,10 @@ void cNeptuneModel::Run(){
         BC_Nept(*this).bcPhi();                                         // extrapolation in k-direction along grid boundaries
 
         restoreVar(1.0);
+
+        // After the state has been advanced and the boundaries applied: put any
+        // superadiabatic column back on the dry adiabat. Off by default (ATNEPT_CONV_ADJ).
+        if(conv_adj_enabled()) ConvectiveAdjustmentNept(*this).run();
 
         panorama_cnt++;
 

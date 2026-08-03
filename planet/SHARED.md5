@@ -15,9 +15,10 @@
 # only thing that catches it is diffing the SHARED.md5 files of the repos against each other.
 # With three models that matters more than it did with two.
 #
-# ATNEPT has only the two output headers so far. The physics templates (Turbulence, Radiation,
-# Precipitation, PressureSolver, BoundaryConditions, SaturationAdjustment, ConvectiveAdjustment,
-# FluxLimiter) are NOT here yet: ATNEPT predates them, its RHS and RungeKutta are the
-# pre-turbulence versions, and adopting them is a physics change rather than a file move.
+# The physics templates are arriving one commit at a time, easiest first, each knob-gated off
+# and verified byte-identical when off. Turbulence, Precipitation, Radiation and
+# BoundaryConditions are NOT here yet — they need prognostic arrays and hooks cNeptuneModel
+# does not have, which is a physics port rather than a file move.
 cb1c5d6d2a17ab71a3325c602833feb2  planet/ATPhys.h
+691bc6241978223d6421f228aabc731b  planet/ConvectiveAdjustment.h
 52a7a800875443e2f8f3ebfe9506c6cd  planet/ParaViewWriter.h
