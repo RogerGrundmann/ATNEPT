@@ -428,6 +428,19 @@ private:
     double m_h2 = 2.016;  // molecular weight of hydrogen in kg/Kmol (molar mass)
     double m_he = 4.02602;  // molecular weight of helium in kg/Kmol
     double m_nh3 = 17.03052;  // molecular weight of ammonia in kg/Kmol
+    // Reaction enthalpy of NH3(g) + H2S(g) -> NH4SH(s), per kg of NH4SH formed.
+    //
+    // From standard enthalpies of formation:
+    //     dHf NH3(g)    -45.90 kJ/mol
+    //     dHf H2S(g)    -20.60 kJ/mol
+    //     dHf NH4SH(s) -156.90 kJ/mol
+    //     dH_rxn = -156.90 - (-45.90 - 20.60) = -90.40 kJ/mol   (exothermic)
+    // divided by m_nh4sh = 51.1114 kg/kmol:  90.40e3 / 0.0511114 = 1.7687e6 J/kg.
+    //
+    // Sign convention here is HEAT RELEASED, so the source term is + dh_nh4sh * w_nh4sh and is
+    // positive where NH4SH is forming. w_nh4sh is kg/(m3 s), so the product is W/m3 — the same
+    // dimension as the enthalpy-diffusion term it is added to, which is the whole point.
+    double dh_nh4sh = 1.7687e6;   // reaction enthalpy of NH4SH formation in J/kg
     double m_nh4sh = 51.1114;  // molecular weight of ammonium hydrosulfide in kg/Kmol
     double m_h2s = 34.08088;  // molecular weight of hydrogen sulfide in kg/Kmol
     double m_h2o = 18.01588;  // molecular weight of water in kg/Kmol

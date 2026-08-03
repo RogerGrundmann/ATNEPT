@@ -34,6 +34,30 @@ public:
     ChemistryNept& operator=(const ChemistryNept&) = delete;
 
     // -----------------------------------------------------------------------
+    // ATNEPT_CHEM_ENTHALPY — what the second term of thermalmassflux is. Default 0 = unchanged.
+    //
+    // The term reads  t * (w_nh3*k_nh3 + w_h2s*k_h2s + w_nh4sh*k_nh4sh), and it is dimensionally
+    // impossible: k_* is a THERMAL CONDUCTIVITY, W/(m K), and w_* a mass production rate,
+    // kg/(m3 s), so the product is kg W/(m4 s K) while the term it is added to is W/m3. They
+    // differ by kg/(m s). The stray factor of t is wrong too — no enthalpy source scales with
+    // absolute temperature.
+    //
+    // What it was meant to be is written in the code's own comment: "source term by chemical
+    // reaction (reaction enthalpy)". That is  w * dh  with dh a SPECIFIC ENTHALPY in J/kg, which
+    // gives W/m3. =1 makes it that, using dh_nh4sh.
+    //
+    // ONE species, not three: w_nh3, w_h2s and w_nh4sh are the SAME reaction expressed in three
+    // masses (the chemistry forms them as -m_nh3*R, -m_h2s*R, +m_nh4sh*R from one rate R), so
+    // summing three enthalpy terms would count the same heat three times. The source is tied to
+    // NH4SH's production rate alone.
+    //
+    // THIS ONE CHANGES THE ANSWER, unlike the other units work: thermalmassflux is read by
+    // RHS_*, not only by the writers. Hence a knob, off by default, and a measurement.
+    static int chem_enthalpy(){
+        static const int v = [](){ const char* e = getenv("ATNEPT_CHEM_ENTHALPY"); return e ? atoi(e) : 0; }();
+        return v;
+    }
+
     void ChemMassRateNept()
     {
         using namespace std;
@@ -202,9 +226,11 @@ public:
                          + m.j_h2s.x[i][j][k]   * m.cp_h2s
                          + m.j_nh4sh.x[i][j][k] * m.cp_nh4sh)           // heat flux by mass transport by diffusion
                          * (dtdr + std::abs(dtdthe)/rm + dtdphi/rmsinthe)         // source term by chemical reaction (reaction enthalpy)
-                         + m.t.x[i][j][k] * (m.w_nh3.x[i][j][k]   * m.k_nh3
+                         + (chem_enthalpy()
+                              ? m.w_nh4sh.x[i][j][k] * m.dh_nh4sh
+                              : m.t.x[i][j][k] * (m.w_nh3.x[i][j][k]   * m.k_nh3
                                            + m.w_h2s.x[i][j][k]   * m.k_h2s
-                                           + m.w_nh4sh.x[i][j][k] * m.k_nh4sh);
+                                           + m.w_nh4sh.x[i][j][k] * m.k_nh4sh));
                 }
             }
         }
