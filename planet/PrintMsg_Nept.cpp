@@ -54,6 +54,16 @@ void cNeptuneModel::printMinMax(){
     cout << endl << " Hydrogen Sulfide " << endl;
     searchMinMax_3D(" max 3D h2s_cloud ", " min 3D h2s_cloud ", " kg/m3", h2s_cloud, 1.0);
     searchMinMax_3D(" max 3D h2s_ice ", " min 3D h2s_ice ", " kg/m3", h2s_ice, 1.0);
+
+    // The turbulence closure's own fields. Zero unless ATNEPT_TURB is set, and printed regardless
+    // so that switching the knob on produces something visible: nue* is what the closure exists
+    // to compute, and the question it must answer on Neptune is whether it is larger or smaller
+    // than the molecular background 1/re = 1e-3. ATSAT's turned out ~77x SMALLER — the opposite of
+    // ATJUP's situation and of what ATJUP's comment claimed — which is why this row is here from
+    // the start rather than added after someone wonders.
+    searchMinMax_3D(" max 3D tke ", " min 3D tke ", "/", tke, 1.0);
+    searchMinMax_3D(" max 3D dis ", " min 3D dis ", "/", dis, 1.0);
+    searchMinMax_3D(" max 3D nue ", " min 3D nue ", "/", nue, 1.0);
     cout << endl;
 
     cout << endl;

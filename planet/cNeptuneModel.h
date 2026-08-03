@@ -62,6 +62,7 @@ class cNeptuneModel{
     template<class M> friend class Reporting;
     template<class M> friend class Radiation;
     template<class M> friend class BoundaryConditions;
+    template<class M> friend class Turbulence;
     friend class BC_Nept;
     friend class ChemistryNept;
     friend class SaturationAdjustmentNept;
@@ -116,6 +117,35 @@ public:
     // drift that does not exist — the lid moved +0.077 K over 28 iterations — and, because the
     // snapshot is taken during INITIALISATION, pinning holds a pre-first-iteration value rather
     // than "where the lid would otherwise have been". Neptune's lid has not been measured at all.
+    // ---- Turbulence closure fields, for the SHARED Turbulence.h ----
+    //
+    // STAGE ONE OF THREE, following the staging ATSAT used (902c609, 4b1072c, then the coupling).
+    // What arrives with this set is the CLOSURE: it reads the velocity field and fills nue* and
+    // its diagnostics. k* and dis* are allocated and written by the closure but are NOT yet
+    // prognostic — nothing integrates them in RungeKutta_Nept, which predates the closure
+    // entirely — and nue* reaches no momentum or scalar equation. Those are stages two and three.
+    //
+    // tken/disn exist now so the prognostic stage has the start-of-step copies it will need
+    // without a second pass over this header.
+    Array tke;                  // turbulent kinetic energy k*      [dimensionless]
+    Array dis;                  // dissipation eps* or omega*       [dimensionless]
+    Array tken;                 // k* at the start of the RK4 step
+    Array disn;                 // dis* at the start of the RK4 step
+    Array nue;                  // eddy viscosity nue* (the closure's own name)
+    Array nue_t;                // eddy viscosity as an RHS would read it
+    Array prod;                 // shear production P_k
+    Array tke_source;           // P_k - Y_k
+    Array dis_source;           // P_w - Y_w + D_w
+    Array_2D vel_star;          // friction velocity u_tau at the first fluid layer [m/s]
+
+    double re_turb = 1.0;       // = vel_star_ref*z_0/nue, set by the closure
+    double abl_height = 20000.0; // boundary-layer height [m]
+
+    // Unlike ATSAT, turb_model is NOT a configuration entry here — adding one means regenerating
+    // ATNEPT's params and config, which is more than this stage needs while the gate is off.
+    std::string turb_model = "k_omega_SST";
+    bool turb_active = false;   // THE gate; set by the knob at the call site
+
     std::vector<std::vector<double> > t_top_init;
 
     std::vector<Array*> bc_fields_radius();

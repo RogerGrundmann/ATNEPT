@@ -13,6 +13,7 @@
 #include "cNeptuneModel.h"
 #include "ConvectiveAdjustmentNept.h"
 #include "RadiationNept.h"
+#include "TurbulenceNept.h"
 #include "PressureSolver.h"
 #include "BC_Nept.h"
 #include "ChemistryNept.h"
@@ -58,6 +59,26 @@ static int press_solver_shared(){
 // where Jupiter, which this scheme was calibrated on, is nearer half but at forty times the
 // absolute flux. Whether a grey scheme tuned there behaves at Neptune's temperatures is exactly
 // what switching this on is for, and is not established by adding it.
+// Turbulence closure (TurbulenceNept), the SHARED Turbulence<Planet> that ATSAT and ATJUP run.
+// DEFAULT OFF; ATNEPT_TURB=1 switches it on, and turb_model = "none" also disables it, so both
+// have to allow it — on ATSAT those were once independent switches and only one of them decided
+// anything, which is worth not repeating. turb_model is k_omega_SST here, as it is on ATSAT.
+//
+// STAGE ONE OF THREE, following the staging ATSAT used. This fills nue* and the closure
+// diagnostics from the velocity field. It does NOT integrate k* and dis* — RungeKutta_Nept
+// predates the closure and has no stages for them — and nue* reaches no momentum or scalar
+// equation. With the knob ON it moves the diagnostic arrays and nothing else; with it OFF it does
+// not run.
+//
+// ATSAT's warning applies here and has NOT been checked on Neptune: ATSAT's `re` is 1000, which
+// made its eddy viscosity ~77x SMALLER than the molecular background — the opposite of ATJUP's
+// situation and the opposite of what ATJUP's comment claimed. The first thing to do after
+// switching this on is compare nue* against 1/re.
+static int turb_env_enabled(){
+    static const int v = [](){ const char* e = getenv("ATNEPT_TURB"); return e ? atoi(e) : 0; }();
+    return v;
+}
+
 static int radiation_enabled(){
     static const int v = [](){ const char* e = getenv("ATNEPT_RADIATION"); return e ? atoi(e) : 0; }();
     return v;
@@ -142,6 +163,12 @@ void cNeptuneModel::LoadConfig(const char *filename){
 *
 */
 void cNeptuneModel::Run(){
+    // THE turbulence gate, resolved once. ATNEPT_TURB and turb_model must BOTH allow it: on ATSAT
+    // these were two independent switches and only one of them decided anything, so a run with
+    // turb_model = "none" still ran the closure. Both are consulted here and the answer is a bool
+    // the rest of the run reads.
+    turb_active = (turb_env_enabled() != 0) && (turb_model != "none");
+
 
     #ifdef _OPENMP
         printf("\n\n   number of processors: %d\n\n", omp_get_num_procs());
@@ -408,6 +435,7 @@ void cNeptuneModel::Run(){
 
         // After the state has been advanced and the boundaries applied: put any
         // superadiabatic column back on the dry adiabat. Off by default (ATNEPT_CONV_ADJ).
+        if(turb_active) TurbulenceNept(*this).run();
         if(radiation_enabled()) RadiationNept(*this).run();
         if(conv_adj_enabled()) ConvectiveAdjustmentNept(*this).run();
 
@@ -506,6 +534,16 @@ void cNeptuneModel::resetArrays(){
 
     thermalmassflux.initArray(im, jm, km, 0.0);   // thermal massflux_h2s
 
+    tke.initArray(im, jm, km, 0.0);
+    dis.initArray(im, jm, km, 0.0);
+    tken.initArray(im, jm, km, 0.0);
+    disn.initArray(im, jm, km, 0.0);
+    nue.initArray(im, jm, km, 0.0);
+    nue_t.initArray(im, jm, km, 0.0);
+    prod.initArray(im, jm, km, 0.0);
+    tke_source.initArray(im, jm, km, 0.0);
+    dis_source.initArray(im, jm, km, 0.0);
+    vel_star.initArray_2D(jm, km, 0.0);
     radiation.initArray(im, jm, km, 0.0);            // net thermal radiative flux [W/m2]
     epsilon.initArray(im, jm, km, 0.0);              // layer emissivity
     Q_rad.initArray(im, jm, km, 0.0);                // radiative heating rate [W/m3]
