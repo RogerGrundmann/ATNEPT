@@ -4,6 +4,19 @@
 CC     = /usr/lib/ggdb
 CFLAGS = -Wall -fPIC -std=c++11 -Ilib -Iplanet -Itinyxml2 -fopenmp
 
+# Header-dependency tracking. -MMD -MP make the compiler emit, beside each object, the list of
+# headers that object was built from; -include feeds those lists back to make so that touching a
+# header rebuilds everything that reads it.
+#
+# ATNEPT HAD NONE OF THIS, and it is not a cosmetic omission. Most of this model's code reaches
+# cNeptuneModel.h, so editing that header left every .o stale while `make` reported success and
+# linked objects compiled against the PREVIOUS class layout. Adding one non-static member was
+# enough to produce a corrupt heap and a config read of nm = 3106158 out of a file saying 2 —
+# a failure that looks like a bug in the new code and is not. ATSAT and ATJUP have carried this
+# since their own build was cleaned up; this brings ATNEPT level.
+DEPDIR   = build/deps
+DEPFLAGS = -MMD -MP -MF $(DEPDIR)/$(@D)/$(@F:.o=.d)
+
 
 # Common files for the shared lib (libatnept.a)
 LIB_OBJ = lib/Array.o lib/Array_2D.o lib/Array_1D.o lib/Config.o lib/Utils.o lib/FFT.o
@@ -11,7 +24,7 @@ LIB_OBJ = lib/Array.o lib/Array_2D.o lib/Array_1D.o lib/Config.o lib/Utils.o lib
 ATNEPT_OBJ = planet/cNeptuneModel.o planet/PrintMsg_Nept.o planet/RungeKutta_Nept.o \
 planet/RHS_Nept.o planet/BC_Nept.o planet/ParaView_Nept.o planet/Thermo_Nept.o \
 planet/SaturationAdjustmentNept.o planet/Chemistry_Nept.o \
-planet/InitVariables_Nept.o planet/FileIO_Nept.o
+planet/InitVariables_Nept.o planet/FileIO_Nept.o planet/Pressure_Nept.o
 
 XML_OBJ = tinyxml2/tinyxml2.o
 
@@ -60,22 +73,32 @@ $(TARGET_DIR)/pyatnept.so: python/pyatnept.cpython-310-x86_64-linux-gnu.so
 
 
 planet/%.o: planet/%.cpp
-	$(CXX) $(CFLAGS) -c $< -o $@
+	@mkdir -p $(DEPDIR)/$(@D)
+	$(CXX) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 lib/%.o: lib/%.cpp
-	$(CXX) $(CFLAGS) -c $< -o $@
+	@mkdir -p $(DEPDIR)/$(@D)
+	$(CXX) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 cli/%.o: cli/%.cpp
-	$(CXX) $(CFLAGS) -c $< -o $@
+	@mkdir -p $(DEPDIR)/$(@D)
+	$(CXX) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 tinyxml2/%.o: tinyxml2/%.cpp
-	$(CXX) $(CFLAGS) -c $< -o $@
+	@mkdir -p $(DEPDIR)/$(@D)
+	$(CXX) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 %.o: %.cpp
-	$(CXX) $(CFLAGS) -c $<
+	@mkdir -p $(DEPDIR)/$(@D)
+	$(CXX) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 .PHONY: clean
 clean:
 	\rm -vf $(LIB_OBJ) $(ATNEPT_OBJ) $(XML_OBJ) $(ATNEPT_CLI_OBJ) $(PARAM_OUTPUTS) nept libatnept.a
 	\rm -vf python/*.so python/*.o python/pyatnept.cpp
 	\rm -rf python/build/
+
+# Feed the generated dependency lists back to make. The minus makes a missing file harmless on a
+# first build.
+DEPFILES = $(patsubst %.o,$(DEPDIR)/%.d,$(LIB_OBJ) $(ATNEPT_OBJ) $(XML_OBJ) $(ATNEPT_CLI_OBJ))
+-include $(DEPFILES)

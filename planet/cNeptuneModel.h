@@ -57,6 +57,7 @@ class cNeptuneModel{
     template<class M> friend class ConvectiveAdjustment;
     template<class M> friend class FluxLimiter;
     template<class M> friend class SaturationAdjustment;
+    template<class M> friend class PressureSolver;
     friend class BC_Nept;
     friend class ChemistryNept;
     friend class SaturationAdjustmentNept;
@@ -90,6 +91,26 @@ public:
         if(!(R_km > 0.0)) return rm;
         return rm + (R_km / L_atm - 1.0);
     }
+
+    // ---- What the SHARED PressureSolver.h asks of this model ----
+    //
+    // has_obstacle() is the same fact is_solid() states cell by cell, asked once: Neptune contains
+    // no solid body, so the solver can skip its obstacle handling entirely.
+    static bool has_obstacle(){ return false; }
+
+    // Whether the projection treats the radial walls as a rigid lid — u = 0 there rather than
+    // extrapolated. False keeps ATNEPT's existing open boundaries. ATSAT answers false too; the
+    // knob that turns it on there is a separate, still-unsettled question.
+    static bool press_rigid_lid(){ return false; }
+
+    // ATNEPT does not stretch the radial coordinate, so the solver's exp_rm factor stays 1.
+    // ATJUP's coord_stretching forms 1/(rm+1), which only makes sense while rad.z starts at 1.
+    bool coord_stretching = false;
+
+    // Radial-wall conditions on the intermediate velocity and the RHS, applied before the
+    // pressure Poisson solve. Mirrored from ATSAT's, which is where the cubic (4/3,-1/3)-style
+    // extrapolation and the rigid-lid alternative are explained. Defined in Pressure_Nept.cpp.
+    void prepareProjectionBoundaries(bool rigid_lid);
 
     // ---- What the SHARED SaturationAdjustment.h asks of this model ----
 
@@ -525,7 +546,10 @@ private:
 
 
     struct CellGeometry {
-        double rm, rm2;
+        // exp_rm/exp_2_rm are the radial coordinate-stretching factors the SHARED
+        // PressureSolver.h reads. ATNEPT does not stretch (coord_stretching = false), so the
+        // solver sets both to 1 and they are carried only so the struct satisfies the template.
+        double rm, rm2, exp_rm, exp_2_rm;
         double sinthe, sinthe2, costhe, cotanthe;
         double inv_rm, inv_rm2;
         double inv_rmsinthe, inv_rm2sinthe, inv_rm2sinthe2;

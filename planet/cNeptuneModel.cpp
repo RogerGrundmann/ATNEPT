@@ -12,6 +12,7 @@
 
 #include "cNeptuneModel.h"
 #include "ConvectiveAdjustmentNept.h"
+#include "PressureSolver.h"
 #include "BC_Nept.h"
 #include "ChemistryNept.h"
 #include "PressureSolverNept.h"
@@ -29,6 +30,22 @@ using namespace AtomUtils;
 // model does that. Whether Neptune develops such columns at all is unmeasured — switching it on
 // and reading the per-iteration report (columns touched, layers mixed, max dT, enthalpy drift)
 // is how to find out. Same convention as every other ported module: gated, off, measured later.
+// Which pressure solver runs. DEFAULT 0 = ATNEPT's own PressureSolverNept, so every existing
+// run stays byte-identical; ATNEPT_PRESS_SOLVER=1 selects the SHARED PressureSolver<Planet> that
+// ATSAT and ATJUP run.
+//
+// THESE ARE NOT THE SAME ALGORITHM, which is why this is a knob rather than a replacement.
+// Measured line-for-line after normalising planet names, ATNEPT's solver overlaps the shared one
+// by 34.3 % and is half its size (105 significant lines against 218). The shared version carries
+// the red-black ordering that makes a sweep mean one thing on any thread count, the obstacle and
+// rigid-lid handling, and the metric-radius and coordinate-stretching hooks. What ATNEPT's does
+// that the shared one may not is not yet established — that comparison is the next question, and
+// it is a physics comparison, not a refactor.
+static int press_solver_shared(){
+    static const int v = [](){ const char* e = getenv("ATNEPT_PRESS_SOLVER"); return e ? atoi(e) : 0; }();
+    return v;
+}
+
 static int conv_adj_enabled(){
     static const int v = [](){ const char* e = getenv("ATNEPT_CONV_ADJ"); return e ? atoi(e) : 0; }();
     return v;
@@ -295,7 +312,8 @@ void cNeptuneModel::Run(){
 
         if(iter_n % 2 == 0){
 
-            PressureSolverNept(*this).run();
+            if(press_solver_shared()) PressureSolver<cNeptuneModel>(*this).run();
+            else                      PressureSolverNept(*this).run();
             AtomUtils::damp_wiggles(p_dyn, nullptr, true, true, true);
 
             SaturationAdjustmentNept(*this).run("H2O",
