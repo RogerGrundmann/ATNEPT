@@ -20,6 +20,7 @@
 # BoundaryConditions are NOT here yet — they need prognostic arrays and hooks cNeptuneModel
 # does not have, which is a physics port rather than a file move.
 cb1c5d6d2a17ab71a3325c602833feb2  planet/ATPhys.h
+51330a5c2f63f3fd4a8248b5f4965e9c  planet/BoundaryConditions.h
 691bc6241978223d6421f228aabc731b  planet/ConvectiveAdjustment.h
 edf00eb9e4a480535cfd4d90339fa7ac  planet/FluxLimiter.h
 52a7a800875443e2f8f3ebfe9506c6cd  planet/ParaViewWriter.h

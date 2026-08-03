@@ -23,6 +23,7 @@
 #include <sys/types.h>
 
 #include "Array.h"
+#include "BoundaryConditions.h"   // BCForm, and the shared BC template
 #include "Array_1D.h"
 #include "Array_2D.h"
 #include "tinyxml2.h"
@@ -78,6 +79,44 @@ public:
     // shared header can say which planet it is running on without knowing anything else
     // about it. ATSAT and ATJUP carry the same accessor.
     static const char* planet_tag(){ return "ATNEPT"; }
+
+    // ---- What the SHARED BoundaryConditions.h asks of this model ----
+    //
+    // The field lists, the loop margin, the default extrapolation form and each knob's default.
+    // Every one is a model FACT rather than a variant of the algorithm, which is why the shared
+    // header asks rather than assumes. Two of ATNEPT's answers differ from ATSAT's and both are
+    // deliberate:
+    //
+    //   bc_margin() = 0.  ATNEPT applies its boundary conditions over the FULL j,k ranges, where
+    //   ATSAT works the interior rows only (margin 1). Changing that would change which cells the
+    //   corners get, so it is stated rather than harmonised.
+    //
+    //   bc_default_form() = NEUMANN, the (4/3,-1/3) two-point extrapolation, where ATSAT defaults
+    //   to the three-point CUBIC. This is not an oversight: BC_Nept.h records the reason — the
+    //   cubic "amplifies alternating errors by 7x per call and is unstable near the SeaMount
+    //   contour". ATJUP defaults to NEUMANN for its own reasons. BCForm::DEFAULT = 0 meaning
+    //   "this planet's own form" is exactly what lets three models disagree here without the
+    //   shared code choosing.
+    //
+    // Every hardening knob is OFF, because on Neptune none of them has been measured.
+    static int bc_margin(){ return 0; }
+    static int bc_default_form(){ return BCForm::NEUMANN; }
+    static int bc_default_rigid_lid(){ return 0; }
+    static int bc_default_top_taper(){ return 0; }
+    static int bc_default_pole_copy(){ return 0; }
+    static int bc_default_radius_copy(){ return 0; }
+
+    std::vector<Array*> bc_fields_radius();
+    std::vector<Array*> bc_fields_theta_extrap();
+    std::vector<Array*> bc_fields_theta_zero();
+    std::vector<Array*> bc_fields_phi();
+
+    // ATNEPT has no turbulence fields at all — Turbulence.h is not among its shared headers and
+    // its RungeKutta predates the closure — so the turbulence boundary pass has nothing to act on
+    // and is switched off at the source rather than given empty work.
+    std::vector<Array*> bc_turb_fields(){ return {}; }
+    std::vector<double> bc_turb_floors(){ return {}; }
+    bool bc_turb_active() const { return false; }
 
     /*
      * ---- Neptune's radiative constants, for the SHARED Radiation.h ----
