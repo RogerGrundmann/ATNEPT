@@ -64,6 +64,9 @@ void cNeptuneModel::printMinMax(){
     searchMinMax_3D(" max 3D tke ", " min 3D tke ", "/", tke, 1.0);
     searchMinMax_3D(" max 3D dis ", " min 3D dis ", "/", dis, 1.0);
     searchMinMax_3D(" max 3D nue ", " min 3D nue ", "/", nue, 1.0);
+    // Per-column friction velocity u_tau, the quantity the closure's k* seed goes as the SQUARE
+    // of. Printed because k* seeding to zero is otherwise unattributable.
+    searchMinMax_2D(" max 2D vel_star ", " min 2D vel_star ", " m/s", vel_star, 1.0);
     cout << endl;
 
     cout << endl;
