@@ -160,6 +160,21 @@ public:
 
     Array rhs_tke;              // tendency of k*,   assembled in RHS_Nept
     Array rhs_dis;              // tendency of dis*, assembled in RHS_Nept
+    // VERIFIED TO EVOLVE, and three commits claimed otherwise. With ATNEPT_TURB=1 the maximum of
+    // k* grows monotonically over six iterations — 0.000779, 0.000811, 0.000841, 0.000871,
+    // 0.000900, 0.000928 — and a direct probe shows the expected mixture of signs in rhs_tke
+    // (-1.29e-03 at i=1, +1.24e-03 at i=2). Stage two has worked since it landed.
+    //
+    // f7c3e96, 07252d9 and aac08d7 said it did not, on a measurement error of mine: the report
+    // prints max AND min on one line, and `sed 's/.*= *//'` is greedy, so it returned the MIN
+    // column — which is zero at the poles. Any extraction from this report must say which column
+    // it wants.
+    //
+    // One real observation survives from that detour: k* holds its k_abl value in the two layers
+    // below abl_height = 20 km (7.470e-04) and sits on the background floor above (7.649e-05), so
+    // only 2 of Neptune's 41 levels are inside the boundary layer. abl_height is 20000 m in all
+    // three models, which is worth revisiting for grids this different — but it is not a defect
+    // and nothing failed because of it.
     Array tke;                  // turbulent kinetic energy k*      [dimensionless]
     Array dis;                  // dissipation eps* or omega*       [dimensionless]
     Array tken;                 // k* at the start of the RK4 step
