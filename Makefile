@@ -21,8 +21,8 @@ DEPFLAGS = -MMD -MP -MF $(DEPDIR)/$(@D)/$(@F:.o=.d)
 # Common files for the shared lib (libatnept.a)
 LIB_OBJ = lib/Array.o lib/Array_2D.o lib/Array_1D.o lib/Config.o lib/Utils.o lib/FFT.o
 
-ATNEPT_OBJ = planet/cNeptuneModel.o planet/PrintMsg_Nept.o planet/RungeKutta_Nept.o \
-planet/RHS_Nept.o planet/BC_Nept.o planet/ParaView_Nept.o planet/Thermo_Nept.o \
+ATNEPT_OBJ = planet/cNeptuneModel.o planet/PrintMsg_Nept.o planet/RungeKutta_Nept_Turb.o \
+planet/RHS_Nept_Turb.o planet/BC_Nept.o planet/ParaView_Nept.o planet/Thermo_Nept.o \
 planet/SaturationAdjustmentNept.o planet/Chemistry_Nept.o \
 planet/InitVariables_Nept.o planet/FileIO_Nept.o planet/Pressure_Nept.o
 
