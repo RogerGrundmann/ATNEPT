@@ -108,8 +108,8 @@ void cNeptuneModel::printMinMax(){
     cout << endl;
 
     cout << endl << " Energies " << endl;
-    searchMinMax_3D(" max 3D sensible heat ", " min 3D sensible heat ", "W/m³", Q_Sensible, 1.0);
-    searchMinMax_3D(" max 3D latent heat ", " min 3D latent heat ", "W/m³", Q_Latent, 1.0);
+    searchMinMax_3D(" max 3D sensible heat ", " min 3D sensible heat ", " W/m3", Q_Sensible, 1.0);
+    searchMinMax_3D(" max 3D latent heat ", " min 3D latent heat ", " W/m3", Q_Latent, 1.0);
     cout << endl << endl;
 }
 /*
