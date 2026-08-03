@@ -55,6 +55,7 @@ class cNeptuneModel{
     // model to take these; see ParaViewWriter.h for what it provides and what it does not.
     template<class M> friend class ParaViewWriter;
     template<class M> friend class ConvectiveAdjustment;
+    template<class M> friend class FluxLimiter;
     friend class BC_Nept;
     friend class ChemistryNept;
     friend class SaturationAdjustmentNept;
@@ -73,6 +74,35 @@ public:
     // shared header can say which planet it is running on without knowing anything else
     // about it. ATSAT and ATJUP carry the same accessor.
     static const char* planet_tag(){ return "ATNEPT"; }
+
+    // ---- Hooks for the shared FluxLimiter<Planet> (FluxLimiter.h) ----
+    //
+    // metricRadius() is the established hook for the one place ATSAT and ATJUP genuinely differ
+    // in the limiter: ATJUP shifts rad.z itself at initialisation and so returns rm unchanged,
+    // while ATSAT shifts the metric factors here instead. ATNEPT is in ATJUP's position for a
+    // simpler reason — it has no metric radius at all — so this is the identity unless
+    // ATNEPT_METRIC_RADIUS is set, and the shared limiter reproduces the m.rad.z[i] the
+    // hand-written copy used, exactly.
+    double metricRadius(double rm){
+        static const double R_km = [](){
+            const char* e = getenv("ATNEPT_METRIC_RADIUS"); return e ? atof(e) : 0.0; }();
+        if(!(R_km > 0.0)) return rm;
+        return rm + (R_km / L_atm - 1.0);
+    }
+
+    // The model's own floor on sin(theta) in the METRIC. ATNEPT declares none, as ATSAT does not;
+    // it exists so ATPhys::polar_divisor_floor<Planet>() compiles. With ATNEPT_SINTHE_TRACK unset
+    // that function returns the literal 0.4 the hand-written limiter used, so this value is not
+    // reached by default. See the ATSAT commit that made that floor one accessor instead of four
+    // drifting literals.
+    static double sinthe_min(){
+        static const double v = [](){
+            const char* e = getenv("ATNEPT_SINTHE_MIN");
+            const double x = e ? atof(e) : 0.0;
+            return (x >= 0.0 && x < 1.0) ? x : 0.0;
+        }();
+        return v;
+    }
 
     static const char* planet_name(){ return "Neptune"; }
     static const char* planet_short(){ return "Nept"; }
