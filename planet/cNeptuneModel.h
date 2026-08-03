@@ -83,6 +83,28 @@ public:
     // about it. ATSAT and ATJUP carry the same accessor.
     static const char* planet_tag(){ return "ATNEPT"; }
 
+    /*
+     * ---- Temperature bounds for the RK4 integrator, as PHYSICAL temperatures ----
+     *
+     * These were bare literals in RungeKutta_Nept_Turb.cpp — t_min = 0.1, t_max = 10.0 — in
+     * NONDIMENSIONAL units, with comments reading "~7.6 K" and "~760 K physical". Those comments
+     * were right for a t_ref they were written against and wrong here: Neptune's t_ref is 72.5, so
+     * the same constants mean 7.25 K and 725 K.
+     *
+     * 725 K IS BELOW THIS MODEL'S OWN INITIAL PROFILE. init_temperature builds the deep equator at
+     * 1111 K, so the first RK step clamped every interior cell there down to the ceiling while
+     * i = 0 — outside the integrator's i = 1..im-2 range — kept its 1111 K. Measured: max|t-t_init|
+     * went 0 -> 377.664 K in one step, at i = 1, and stayed at exactly that value on the next step,
+     * which is what a clamp looks like and what a tendency does not.
+     *
+     * Expressed in KELVIN here and divided by t_ref at the point of use, so the number means the
+     * same thing on every planet and cannot go stale when t_ref changes. The ceiling is a NUMERICAL
+     * guard against a runaway, not a physical claim: it is set clear of anything the model
+     * constructs rather than at a temperature Neptune is believed to reach.
+     */
+    static double t_min_K(){ return 7.5;    }   // floor; prevents a buoyancy blow-up
+    static double t_max_K(){ return 2000.0; }   // ceiling; well above the 1111 K init_temperature builds
+
     // ---- What the SHARED BoundaryConditions.h asks of this model ----
     //
     // The field lists, the loop margin, the default extrapolation form and each knob's default.
