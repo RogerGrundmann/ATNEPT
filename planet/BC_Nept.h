@@ -42,150 +42,25 @@ private:
 // Inline implementation
 // -----------------------------------------------------------------------
 #include "cNeptuneModel.h"
+#include "BoundaryConditions.h"
 #include "Utils.h"
 
 using namespace AtomUtils;
 
 
-inline void BC_Nept::bcRadius()
-{
-    const int im = m.im, jm = m.jm, km = m.km;
-    const double c43 = m.c43, c13 = m.c13;
-
-    // All fields: 2-point Neumann extrapolation at both radial boundaries.
-//    // Temperature is handled separately below (Dirichlet at i=0).
-    // The 3-point cubic (f[3]-3f[2]+3f[1]) amplifies alternating errors
-    // by 7x per call and is unstable near the SeaMount contour.
-    Array* fields[] = {
-        &m.t, &m.u, &m.v, &m.w,
-//        &m.u, &m.v, &m.w,
-        &m.ch4, &m.ch4_cloud, &m.ch4_ice,
-        &m.h2o, &m.h2o_cloud, &m.h2o_ice,
-        &m.h2s, &m.h2s_cloud, &m.h2s_ice,
-        &m.nh3, &m.nh3_cloud, &m.nh3_ice,
-        &m.nh4sh,
-        &m.j_h2s,   &m.j_nh3,   &m.j_nh4sh,
-        &m.jT_h2s,  &m.jT_nh3,  &m.jT_nh4sh,
-        &m.w_h2s,   &m.w_nh3,   &m.w_nh4sh,
-        &m.massflux_h2s,  &m.massflux_nh3, &m.massflux_nh4sh,
-        &m.fluxlim_nh4sh,
-        &m.difflux_h2s,   &m.difflux_nh3,  &m.difflux_nh4sh,
-        &m.thermalmassflux,
-        &m.rho_mix,
-        &m.CoriolisForce, &m.CentrifugalForce,
-        &m.BuoyancyForce, &m.PresGradForce,
-        &m.Q_Latent, &m.Q_Sensible
-    };
-    const int nf = (int)(sizeof(fields) / sizeof(fields[0]));
-
-    #pragma omp parallel for schedule(static)
-    for(int j = 0; j < jm; j++){
-        for(int k = 0; k < km; k++){
-            for(int f = 0; f < nf; f++){
-                Array& F = *fields[f];
-                F.x[0][j][k]    = c43*F.x[1][j][k]    - c13*F.x[2][j][k];
-                F.x[im-1][j][k] = c43*F.x[im-2][j][k] - c13*F.x[im-3][j][k];
-            }
-        }
-    }
-}
-
-
-inline void BC_Nept::bcTheta()
-{
-    const int im = m.im, jm = m.jm, km = m.km;
-    const double c43 = m.c43, c13 = m.c13;
-
-    // Scalar/tracer fields: 2-point Neumann extrapolation at poles.
-    Array* extrap_fields[] = {
-        &m.t, &m.u,
-        &m.ch4, &m.ch4_cloud, &m.ch4_ice,
-        &m.h2o, &m.h2o_cloud, &m.h2o_ice,
-        &m.h2s, &m.h2s_cloud, &m.h2s_ice,
-        &m.nh3, &m.nh3_cloud, &m.nh3_ice,
-        &m.nh4sh,
-        &m.j_h2s,   &m.j_nh3,   &m.j_nh4sh,
-        &m.jT_h2s,  &m.jT_nh3,  &m.jT_nh4sh,
-        &m.w_h2s,   &m.w_nh3,   &m.w_nh4sh,
-        &m.thermalmassflux,
-        &m.rho_mix,
-        &m.CoriolisForce, &m.CentrifugalForce,
-        &m.BuoyancyForce, &m.PresGradForce,
-        &m.Q_Latent, &m.Q_Sensible
-    };
-    const int nf = (int)(sizeof(extrap_fields) / sizeof(extrap_fields[0]));
-
-    // Flux fields that are singular near the poles: zeroed at pole boundaries.
-    Array* zero_at_poles[] = {
-        &m.massflux_h2s, &m.massflux_nh3, &m.massflux_nh4sh,
-        &m.fluxlim_nh4sh,
-        &m.difflux_h2s,  &m.difflux_nh3, &m.difflux_nh4sh,
-    };
-    const int nz = (int)(sizeof(zero_at_poles) / sizeof(zero_at_poles[0]));
-
-    #pragma omp parallel for schedule(static)
-    for(int k = 0; k < km; k++){
-        for(int i = 0; i < im; i++){
-            m.v.x[i][0][k]    = 0.0;
-            m.v.x[i][jm-1][k] = 0.0;
-            m.w.x[i][0][k]    = 0.0;
-            m.w.x[i][jm-1][k] = 0.0;
-
-            for(int f = 0; f < nf; f++){
-                Array& F = *extrap_fields[f];
-                F.x[i][0][k]    = c43*F.x[i][1][k]    - c13*F.x[i][2][k];
-                F.x[i][jm-1][k] = c43*F.x[i][jm-2][k] - c13*F.x[i][jm-3][k];
-            }
-
-            for(int f = 0; f < nz; f++){
-                Array& F = *zero_at_poles[f];
-                F.x[i][0][k]    = 0.0;
-                F.x[i][jm-1][k] = 0.0;
-            }
-        }
-    }
-}
-
-
-inline void BC_Nept::bcPhi()
-{
-    const int im = m.im, jm = m.jm, km = m.km;
-    const double c43 = m.c43, c13 = m.c13;
-
-    // Periodic phi: average extrapolated values from both ends.
-    Array* fields[] = {
-        &m.t, &m.u, &m.v, &m.w,
-        &m.ch4, &m.ch4_cloud, &m.ch4_ice,
-        &m.h2o, &m.h2o_cloud, &m.h2o_ice,
-        &m.h2s, &m.h2s_cloud, &m.h2s_ice,
-        &m.nh3, &m.nh3_cloud, &m.nh3_ice,
-        &m.nh4sh,
-        &m.j_h2s,   &m.j_nh3,   &m.j_nh4sh,
-        &m.jT_h2s,  &m.jT_nh3,  &m.jT_nh4sh,
-        &m.w_h2s,   &m.w_nh3,   &m.w_nh4sh,
-        &m.massflux_h2s,  &m.massflux_nh3,  &m.massflux_nh4sh,
-        &m.fluxlim_nh4sh,
-        &m.difflux_h2s,   &m.difflux_nh3,   &m.difflux_nh4sh,
-        &m.thermalmassflux,
-        &m.rho_mix,
-        &m.CoriolisForce, &m.CentrifugalForce,
-        &m.BuoyancyForce, &m.PresGradForce,
-        &m.Q_Latent, &m.Q_Sensible
-    };
-    const int nf = (int)(sizeof(fields) / sizeof(fields[0]));
-
-    #pragma omp parallel for schedule(static)
-    for(int i = 0; i < im; i++){
-        for(int j = 0; j < jm; j++){
-            for(int f = 0; f < nf; f++){
-                Array& F = *fields[f];
-                double lo = c43*F.x[i][j][1]    - c13*F.x[i][j][2];
-                double hi = c43*F.x[i][j][km-2] - c13*F.x[i][j][km-3];
-                F.x[i][j][0] = F.x[i][j][km-1] = 0.5*(lo + hi);
-            }
-        }
-    }
-}
+/*
+ * The three boundary passes are the SHARED BoundaryConditions<Planet> now. What used to be here —
+ * three field lists walked with a (4/3,-1/3) extrapolation — is the same algorithm the other two
+ * models run; the lists moved to cNeptuneModel (BC_Nept.cpp) because they are Neptune's, and the
+ * two places this model genuinely differs are named there as bc_margin() = 0 and
+ * bc_default_form() = NEUMANN.
+ *
+ * BC_Nept stays as the name so no call site changes, and because initTropopauseLayers below is
+ * ATNEPT's own and has no counterpart in the shared header.
+ */
+inline void BC_Nept::bcRadius() { BoundaryConditions<cNeptuneModel>(m).bcRadius(); }
+inline void BC_Nept::bcTheta()  { BoundaryConditions<cNeptuneModel>(m).bcTheta();  }
+inline void BC_Nept::bcPhi()    { BoundaryConditions<cNeptuneModel>(m).bcPhi();    }
 
 
 inline void BC_Nept::initTropopauseLayers()

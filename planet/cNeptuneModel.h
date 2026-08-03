@@ -61,6 +61,7 @@ class cNeptuneModel{
     template<class M> friend class PressureSolver;
     template<class M> friend class Reporting;
     template<class M> friend class Radiation;
+    template<class M> friend class BoundaryConditions;
     friend class BC_Nept;
     friend class ChemistryNept;
     friend class SaturationAdjustmentNept;

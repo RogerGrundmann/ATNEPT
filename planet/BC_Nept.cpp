@@ -61,6 +61,12 @@ std::vector<Array*> cNeptuneModel::bc_fields_theta_extrap(){
 
 std::vector<Array*> cNeptuneModel::bc_fields_theta_zero(){
     return {
+        // v and w FIRST, and they are the reason this list is not just the flux fields: BC_Nept
+        // zeroed the two tangential velocities at the poles with four hand-written lines outside
+        // its zero list, so transcribing only the list left them extrapolated instead. Caught by
+        // the acceptance test — 5 of 7 output files differed, and the two that did not (longal at
+        // fixed j, and the panorama) are exactly the ones a theta-boundary error cannot reach.
+        &v, &w,
         &massflux_h2s, &massflux_nh3, &massflux_nh4sh,
         &fluxlim_nh4sh,
         &difflux_h2s,  &difflux_nh3, &difflux_nh4sh
