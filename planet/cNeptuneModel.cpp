@@ -337,6 +337,14 @@ void cNeptuneModel::Run(){
 
     restoreVar(1.0);
 
+    // The closure SEEDS k* and dis* algebraically (Turbulence<Planet>::init_fields) before the
+    // transport equations start carrying them. It belongs exactly here — after Forces,
+    // Latent_Heat, the three boundary passes and the first restoreVar — because init_fields reads
+    // the velocity field and the layer geometry, and none of that exists at the top of Run().
+    // Putting the call there segfaults; this is ATSAT's slot (cSaturnModel.cpp, right after its
+    // own pre-loop restoreVar) and it is the same slot for the same reason.
+    if(turb_active) TurbulenceNept(*this).init();
+
 //    goto Printout;
 
 
