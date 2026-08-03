@@ -51,6 +51,9 @@ namespace{
 
 class cNeptuneModel{
 
+    // Shared physics/output templates (SHARED.md5, `make check-shared`). ATNEPT is the third
+    // model to take these; see ParaViewWriter.h for what it provides and what it does not.
+    template<class M> friend class ParaViewWriter;
     friend class BC_Nept;
     friend class ChemistryNept;
     friend class SaturationAdjustmentNept;
@@ -58,6 +61,21 @@ class cNeptuneModel{
     friend class VelocityInitializerNept;
 
 public:
+
+    // ---- Hooks for the shared ParaViewWriter<Planet> (ParaViewWriter.h) ----
+    // planet_name() is the word in an output FILE name ("Neptune_radial_20_1.vtk");
+    // planet_short() is the abbreviation inside a .vtk title line
+    // ("Radial_Data_Nept_Circulation"). ATNEPT carried both spellings by hand, and its
+    // "has been written" line used the SHORT one — so it announced Nept_radial_20_1.vtk,
+    // a file that does not exist. The shared writer names the file it actually wrote.
+    static const char* planet_name(){ return "Neptune"; }
+    static const char* planet_short(){ return "Nept"; }
+
+    // What the panorama .vts prints in its "Temperature" array. Neptune writes degrees
+    // Celsius, as ATJUP does; ATSAT writes kelvin/10. See the note on the same hook in
+    // cSaturnModel.h — one array name, three models, two different quantities.
+    double paraview_temperature(double t_nd) const { return t_nd * t_ref - 273.15; }
+
 
     const char *filename;
 

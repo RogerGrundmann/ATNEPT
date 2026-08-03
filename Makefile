@@ -41,6 +41,11 @@ $(PARAM_OUTPUTS): param.py
 	rm -f planet/cNeptuneModel.o
 	python3 param.py
 
+# Verify the shared headers have not diverged between the planet models.
+.PHONY: check-shared
+check-shared:
+	@grep -v '^#' planet/SHARED.md5 | md5sum -c - && echo "shared headers OK"
+
 analyze:
 	analyze-build make
 

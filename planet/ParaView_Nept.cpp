@@ -9,122 +9,28 @@
 */
 
 #include "cNeptuneModel.h"
+#include "ParaViewWriter.h"
 
 using namespace std;
 //using namespace AtomUtils;
 
-namespace ParaViewNeptune{
-    void dump_array(const string &name, Array &a, double multiplier, ofstream &f) {
-        f <<  "    <DataArray type=\"Float32\" Name=\"" << name << "\" format=\"ascii\">\n";
-        for (int k = 0; k < a.km; k++){
-            for (int j = 0; j < a.jm; j++){
-                for (int i = 0; i < a.im; i++){
-                    f << (a.x[i][j][k] * multiplier) << endl;
-                }
-                f << "\n";
-            }
-            f << "\n";
-        }
-        f << "\n";
-        f << "    </DataArray>\n";
-    }
-/*
- * 
-*/
-    void dump_radial(const string &desc, Array &a, double multiplier, int i, ofstream &f){
-        f << "SCALARS " << desc << " float " << 1 << endl;
-        f << "LOOKUP_TABLE default" << endl;
-        for (int j = 0; j < a.jm; j++){
-            for (int k = 0; k < a.km; k++){
-                f << (a.x[i][j][k] * multiplier) << endl;
-            }
-        }
-    }
-/*
- * 
-*/
-    void dump_radial_2d(const string &desc, Array_2D &a, double multiplier, ofstream &f){
-        f << "SCALARS " << desc << " float " << 1 << endl;
-        f << "LOOKUP_TABLE default" << endl;
-        for (int j = 0; j < a.jm; j++){
-            for (int k = 0; k < a.km; k++){
-                f << (a.y[j][k] * multiplier) << endl;
-            }
-        }
-    }
-/*
- * 
-*/
-    void dump_zonal(const string &desc, Array &a, double multiplier, int k, ofstream &f){
-        f <<  "SCALARS " << desc << " float " << 1 << endl;
-        f <<  "LOOKUP_TABLE default" << endl;
-        for(int i = 0; i < a.im; i++){
-            for(int j = 0; j < a.jm; j++){
-                f << (a.x[i][j][k] * multiplier) << endl;
-            }
-        }
-    }
-/*
- * 
-*/
-    void dump_longal(const string &desc, Array &a, double multiplier, int j, ofstream &f){
-        f << "SCALARS " << desc << " float " << 1 << endl;
-        f << "LOOKUP_TABLE default" << endl;
-        for (int i = 0; i < a.im; i++){
-            for (int k = 0; k < a.km; k++){
-                f << (a.x[i][j][k] * multiplier) << endl;
-            }
-        }
-    }
-}
+// The five dumpers moved to the SHARED ParaViewWriter.h, as namespace ParaViewIO.
+// ATNEPT's copies were IDENTICAL to ATSAT's and ATJUP's apart from `for (` spacing
+// and the /* */ separators between them.
 /*
  * 
 */
 void cNeptuneModel::paraview_panorama_vts(int n){
-    using namespace ParaViewNeptune;
-    double x, y, z, dx, dy, dz;
+    using namespace ParaViewIO;
+    // Header, coordinates, the Velocity array and the Temperature array are the
+    // SHARED ParaViewWriter.h. What stays here is the field list below and the
+    // scalars string that has to agree with it.
     double r_mix_plus = r_mix * 1e6;
-    string Neptune_panorama_vts_File_Name = output_path + "/Neptune_panorama_" 
-        + std::to_string(n) + ".vts";
-    ofstream Neptune_panorama_vts_File;
-    Neptune_panorama_vts_File.precision(4);
-    Neptune_panorama_vts_File.setf(ios::fixed);
-    Neptune_panorama_vts_File.open(Neptune_panorama_vts_File_Name);
-    if(!Neptune_panorama_vts_File.is_open()){
-        cerr << "ERROR: could not open shpere_vts file " << __FILE__ 
-            << " at line " << __LINE__ << "\n";
-        abort();
-    }
-    Neptune_panorama_vts_File <<  "<?xml version=\"1.0\"?>\n"  << endl;
-    Neptune_panorama_vts_File <<  "<VTKFile type=\"StructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">\n"  << endl;
-    Neptune_panorama_vts_File <<  " <StructuredGrid WholeExtent=\"" << 1 << " "<< im << " "<< 1 << " " << jm << " "<< 1 << " " << km << "\">\n"  << endl;
-    Neptune_panorama_vts_File <<  "  <Piece Extent=\"" << 1 << " "<< im << " "<< 1 << " " << jm << " "<< 1 << " " << km << "\">\n"  << endl;
-    Neptune_panorama_vts_File <<  "   <PointData Vectors=\"Velocity\" Scalars=\"Temperature PressureDynamic PressureStatic NH3 NH3Cloud NH3Ice H2O H2OCloud H2OIce Q_Latent Q_Sensible BuoyancyForce \">\n"  << endl;
-
-    Neptune_panorama_vts_File <<  "    <DataArray type=\"Float32\" NumberOfComponents=\"3\" Name=\"Velocity\" format=\"ascii\">\n"  << endl;
-    for(int k = 0; k < km; k++){
-        for(int j = 0; j < jm; j++){
-            for(int i = 0; i < im; i++){
-                Neptune_panorama_vts_File << u.x[i][j][k] << " " << v.x[i][j][k] << " " << w.x[i][j][k] << endl;
-            }
-            Neptune_panorama_vts_File <<  "\n"  << endl;
-        }
-        Neptune_panorama_vts_File <<  "\n"  << endl;
-    }
-    Neptune_panorama_vts_File <<  "\n"  << endl;
-    Neptune_panorama_vts_File <<  "    </DataArray>\n" << endl;
-    Neptune_panorama_vts_File <<  "    <DataArray type=\"Float32\" Name=\"Temperature\" format=\"ascii\">\n"  << endl;
-    for(int k = 0; k < km; k++){
-        for(int j = 0; j < jm; j++){
-            for(int i = 0; i < im; i++){
-                Neptune_panorama_vts_File << t.x[i][j][k] * t_ref - 273.15 << endl;
-            }
-            Neptune_panorama_vts_File <<  "\n"  << endl;
-        }
-        Neptune_panorama_vts_File <<  "\n"  << endl;
-    }
-    Neptune_panorama_vts_File <<  "\n"  << endl;
-    Neptune_panorama_vts_File <<  "    </DataArray>\n" << endl;
+    ParaViewWriter<cNeptuneModel> pv(*this);
+    ofstream Neptune_panorama_vts_File = pv.open_panorama(n,
+        "Temperature PressureDynamic PressureStatic NH3 NH3Cloud NH3Ice H2O H2OCloud H2OIce Q_Latent Q_Sensible BuoyancyForce ");
+    pv.panorama_velocity(Neptune_panorama_vts_File);
+    pv.panorama_temperature(Neptune_panorama_vts_File);
     dump_array("u-component", u, u_0, Neptune_panorama_vts_File);
     dump_array("v-component", v, u_0, Neptune_panorama_vts_File);
     dump_array("w-component", w, u_0, Neptune_panorama_vts_File);
@@ -167,80 +73,18 @@ void cNeptuneModel::paraview_panorama_vts(int n){
 //    dump_array("Q_Latent", Q_Latent, 1.0, Neptune_panorama_vts_File);
 //    dump_array("Q_Sensible", Q_Sensible, 1.0, Neptune_panorama_vts_File);
 
-    Neptune_panorama_vts_File <<  "   </PointData>\n" << endl;
-    Neptune_panorama_vts_File <<  "   <Points>\n"  << endl;
-    Neptune_panorama_vts_File <<  "    <DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">\n"  << endl;
-    x = 0.0;
-    y = 0.0;
-    z = 0.0;
-    dx = 0.1;
-    dy = 0.1;
-    dz = 0.1;
-    for(int k = 0; k < km; k++){
-        for(int j = 0; j < jm; j++){
-            for(int i = 0; i < im; i++){
-                if(k == 0 || j == 0) x = 0.0;
-                else x = x + dx;
-                Neptune_panorama_vts_File << x << " " << y << " " << z  << endl;
-            }
-            x = 0;
-            y = y + dy;
-            Neptune_panorama_vts_File <<  "\n"  << endl;
-        }
-        y = 0.0;
-        z = z + dz;
-        Neptune_panorama_vts_File <<  "\n"  << endl;
-    }
-    Neptune_panorama_vts_File <<  "    </DataArray>\n"  << endl;
-    Neptune_panorama_vts_File <<  "   </Points>\n"  << endl;
-    Neptune_panorama_vts_File <<  "  </Piece>\n"  << endl;
-    Neptune_panorama_vts_File <<  " </StructuredGrid>\n"  << endl;
-    Neptune_panorama_vts_File <<  "</VTKFile>\n"  << endl;
-    Neptune_panorama_vts_File.close();
-    cout << "   File:  " << "Nept_panorama_" 
-        << n << ".vts" << "  has been written to Directory:  " 
-        << output_path << endl;
+    pv.close_panorama(Neptune_panorama_vts_File, n);
     return;
 }
 /*
  * 
 */
 void cNeptuneModel::paraview_vtk_radial(int n, int i_radial){
-    using namespace ParaViewNeptune;
-    double x, y, z, dx, dy;
+    using namespace ParaViewIO;
     double r_mix_plus = r_mix * 1e6;
-    string Neptune_radial_File_Name = output_path + "/Neptune_radial_" 
-        + std::to_string(i_radial) + "_" + std::to_string(n) + ".vtk";
-    ofstream Neptune_vtk_radial_File;
-    Neptune_vtk_radial_File.precision (4);
-    Neptune_vtk_radial_File.setf(ios::fixed);
-    Neptune_vtk_radial_File.open(Neptune_radial_File_Name);
-    if(!Neptune_vtk_radial_File.is_open()){
-        cerr << "ERROR: could not open paraview_vtk file " << __FILE__ 
-            << " at line " << __LINE__ << "\n";
-        abort();
-    }
-    Neptune_vtk_radial_File <<  "# vtk DataFile Version 3.0" << endl;
-    Neptune_vtk_radial_File <<  "Radial_Data_Nept_Circulation\n";
-    Neptune_vtk_radial_File <<  "ASCII" << endl;
-    Neptune_vtk_radial_File <<  "DATASET STRUCTURED_GRID" << endl;
-    Neptune_vtk_radial_File <<  "DIMENSIONS " << km << " "<< jm << " " << 1 << endl;
-    Neptune_vtk_radial_File <<  "POINTS " << jm * km << " float" << endl;
-    x = 0.0;
-    y = 0.0;
-    z = 0.0;
-    dx = 0.1;
-    dy = 0.1;
-    for(int j = 0; j < jm; j++){
-        for(int k = 0; k < km; k++){
-            if(k == 0) y = 0.0;
-            else y = y + dy;
-            Neptune_vtk_radial_File << x << " " << y << " "<< z << endl;
-        }
-        y = 0.0;
-        x = x + dx;
-    }
-    Neptune_vtk_radial_File <<  "POINT_DATA " << jm * km << endl;
+    ofstream Neptune_vtk_radial_File = ParaViewWriter<cNeptuneModel>(*this)
+        .open_slice("radial", "Radial", i_radial, n, km, jm, 0.1, false);
+    const double z = 0.0;   // out-of-plane component of the in-plane vector below
     dump_radial("u-Component", u, u_0, i_radial, Neptune_vtk_radial_File);
     dump_radial("v-Component", v, u_0, i_radial, Neptune_vtk_radial_File);
     dump_radial("w-Component", w, u_0, i_radial, Neptune_vtk_radial_File);
@@ -306,51 +150,18 @@ void cNeptuneModel::paraview_vtk_radial(int n, int i_radial){
             Neptune_vtk_radial_File << v.x[i_radial][j][k] << " " << w.x[i_radial][j][k] << " " << z << endl;
         }
     }
-    Neptune_vtk_radial_File.close();
-    cout << "   File:  " << "Nept_radial_" 
-        << i_radial << "_" << n << ".vtk" 
-        << "  has been written to Directory:  " << output_path << endl;
+    ParaViewWriter<cNeptuneModel>(*this).close_slice(Neptune_vtk_radial_File, "radial", i_radial, n);
     return;
 }
 /*
  * 
 */
 void cNeptuneModel::paraview_vtk_zonal(int n, int k_zonal){
-    using namespace ParaViewNeptune;
-    double x, y, z, dx, dy;
+    using namespace ParaViewIO;
     double r_mix_plus = r_mix * 1e6;
-    string Neptune_zonal_File_Name = output_path + "/Neptune_zonal_" 
-        + std::to_string(k_zonal) + "_" + std::to_string(n) + ".vtk";
-    ofstream Neptune_vtk_zonal_File;
-    Neptune_vtk_zonal_File.precision(4);
-    Neptune_vtk_zonal_File.setf(ios::fixed);
-    Neptune_vtk_zonal_File.open(Neptune_zonal_File_Name);
-    if(!Neptune_vtk_zonal_File.is_open()){
-        cerr << "ERROR: could not open vtk_zonal file " << __FILE__ 
-            << " at line " << __LINE__ << "\n";
-        abort();
-    }
-    Neptune_vtk_zonal_File <<  "# vtk DataFile Version 3.0" << endl;
-    Neptune_vtk_zonal_File <<  "Zonal_Data_Nept_Circulation\n";
-    Neptune_vtk_zonal_File <<  "ASCII" << endl;
-    Neptune_vtk_zonal_File <<  "DATASET STRUCTURED_GRID" << endl;
-    Neptune_vtk_zonal_File <<  "DIMENSIONS " << jm << " "<< im << " " << 1 << endl;
-    Neptune_vtk_zonal_File <<  "POINTS " << im * jm << " float" << endl;
-    x = 0.0;
-    y = 0.0;
-    z = 0.0;
-    dx = 0.1;
-    dy = 0.05;
-    for(int i = 0; i < im; i++){
-        for(int j = 0; j < jm; j++){
-            if(j == 0) y = 0.0;
-            else y = y + dy;
-            Neptune_vtk_zonal_File << x << " " << y << " "<< z << endl;
-        }
-        y = 0.0;
-        x = x + dx;
-    }
-    Neptune_vtk_zonal_File <<  "POINT_DATA " << im * jm << endl;
+    ofstream Neptune_vtk_zonal_File = ParaViewWriter<cNeptuneModel>(*this)
+        .open_slice("zonal", "Zonal", k_zonal, n, jm, im, 0.05, false);
+    const double z = 0.0;   // out-of-plane component of the in-plane vector below
     dump_zonal("u-Component", u, u_0, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("v-Component", v, u_0, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("w-Component", w, u_0, k_zonal, Neptune_vtk_zonal_File);
@@ -418,54 +229,18 @@ void cNeptuneModel::paraview_vtk_zonal(int n, int k_zonal){
             Neptune_vtk_zonal_File << u.x[i][j][k_zonal] << " " << v.x[i][j][k_zonal] << " " << z << endl;
         }
     }
-    Neptune_vtk_zonal_File.close();
-    cout << "   File:  " << "Nept_zonal_" 
-        << k_zonal << "_" << n << ".vtk" 
-        << "  has been written to Directory:  " << output_path << endl;
+    ParaViewWriter<cNeptuneModel>(*this).close_slice(Neptune_vtk_zonal_File, "zonal", k_zonal, n);
     return;
 }
 /*
  * 
 */
 void cNeptuneModel::paraview_vtk_longal(int n, int j_longal){
-    using namespace ParaViewNeptune;
-    double x, y, z, dx, dz;
+    using namespace ParaViewIO;
     double r_mix_plus = r_mix * 1e6;
-    string Neptune_longal_File_Name = output_path + "/Neptune_longal_" 
-        + std::to_string(j_longal) + "_" + std::to_string(n) + ".vtk";
-    ofstream Neptune_vtk_longal_File;
-    Neptune_vtk_longal_File.precision(4);
-    Neptune_vtk_longal_File.setf(ios::fixed);
-    Neptune_vtk_longal_File.open(Neptune_longal_File_Name);
-    if(!Neptune_vtk_longal_File.is_open()){
-        cerr << "ERROR: could not open vtk_longal file " 
-            << __FILE__ << " at line " << __LINE__ << "\n";
-        abort();
-    }
-    Neptune_vtk_longal_File <<  "# vtk DataFile Version 3.0" << endl;
-    Neptune_vtk_longal_File <<  "Longitudinal_Data_Nept_Circulation\n";
-    Neptune_vtk_longal_File <<  "ASCII" << endl;
-    Neptune_vtk_longal_File <<  "DATASET STRUCTURED_GRID" << endl;
-    Neptune_vtk_longal_File <<  "DIMENSIONS " << km << " "<< im << " " << 1 << endl;
-    Neptune_vtk_longal_File <<  "POINTS " << im * km << " float" << endl;
-    x = 0.0;
-    y = 0.0;
-    z = 0.0;
-    dx = 0.1;
-    dz = 0.025;
-    for(int i = 0; i < im; i++){
-        for(int k = 0; k < km; k++){
-            if(k == 0){
-                z = 0.0;
-            }else{
-                z = z + dz;
-            }
-            Neptune_vtk_longal_File << x << " " << y << " "<< z << endl;
-        }
-        z = 0.0;
-        x = x + dx;
-    }
-    Neptune_vtk_longal_File <<  "POINT_DATA " << im * km << endl;
+    ofstream Neptune_vtk_longal_File = ParaViewWriter<cNeptuneModel>(*this)
+        .open_slice("longal", "Longitudinal", j_longal, n, km, im, 0.025, true);
+    const double y = 0.0;   // out-of-plane component; longal advances z, so y stayed 0
     dump_longal("u-Component", u, u_0, j_longal, Neptune_vtk_longal_File);
     dump_longal("v-Component", v, u_0, j_longal, Neptune_vtk_longal_File);
     dump_longal("w-Component", w, u_0, j_longal, Neptune_vtk_longal_File);
@@ -536,17 +311,14 @@ void cNeptuneModel::paraview_vtk_longal(int n, int j_longal){
                 << y << " " << w.x[i][j_longal][k] << endl;
         }
     }
-    Neptune_vtk_longal_File.close();
-    cout << "   File:  " << "Nept_longal_" 
-        << j_longal << "_" << n << ".vtk" 
-        << "  has been written to Directory:  " << output_path << endl;
+    ParaViewWriter<cNeptuneModel>(*this).close_slice(Neptune_vtk_longal_File, "longal", j_longal, n);
     return;
 }
 /*
  * 
 */
 void cNeptuneModel::paraview_sphere_vts(int n){
-    using namespace ParaViewNeptune;
+    using namespace ParaViewIO;
     double x, y, z, sinthe, sinphi, costhe, cosphi;
     double r_mix_plus = r_mix * 1e6;
     string Neptune_sphere_vts_File_Name = output_path + "/Neptune_sphere_" 
