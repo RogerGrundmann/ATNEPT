@@ -14,6 +14,7 @@
 #include "ConvectiveAdjustmentNept.h"
 #include "RadiationNept.h"
 #include "TurbulenceNept.h"
+#include "PrecipitationNept.h"
 #include "PressureSolver.h"
 #include "BC_Nept.h"
 #include "ChemistryNept.h"
@@ -74,6 +75,16 @@ static int press_solver_shared(){
 // made its eddy viscosity ~77x SMALLER than the molecular background — the opposite of ATJUP's
 // situation and the opposite of what ATJUP's comment claimed. The first thing to do after
 // switching this on is compare nue* against 1/re.
+// Precipitation microphysics (PrecipitationNept), the SHARED Precipitation<Planet>. DEFAULT OFF.
+// ATSAT runs its precipitation ON by an explicit decision taken after measuring it; ATNEPT's has
+// not been measured, and a module that feeds back into the condensate fields is not something to
+// switch on by inheritance. It DOES feed back — the condensate it converts is removed from
+// cloud/ice in place — so it must run AFTER the SaturationAdjustment calls or they undo it.
+static int precip_enabled(){
+    static const int v = [](){ const char* e = getenv("ATNEPT_PRECIP"); return e ? atoi(e) : 0; }();
+    return v;
+}
+
 static int turb_env_enabled(){
     static const int v = [](){ const char* e = getenv("ATNEPT_TURB"); return e ? atoi(e) : 0; }();
     return v;
@@ -396,6 +407,9 @@ void cNeptuneModel::Run(){
                 C_ch4, L0_ch4, R_ch4, del_alf_ch4, del_bet_ch4, m_ch4,
                 ch4, ch4_cloud, ch4_ice);
 
+            // Must follow the saturation adjustments: it removes condensate in place.
+            if(precip_enabled()) PrecipitationNept(*this).run();
+
             ChemistryNept(*this).DiffMassFluxNept();
 
             AtomUtils::damp_wiggles(difflux_h2s,     nullptr, true, true, true);
@@ -563,6 +577,31 @@ void cNeptuneModel::resetArrays(){
     acc_nh3_cloud.initArray(im, jm, km, 0.0);
     acc_nh3_ice.initArray(im, jm, km, 0.0);
     acc_nh4sh.initArray(im, jm, km, 0.0);
+    P_rain.initArray(im, jm, km, 0.0);
+    P_snow.initArray(im, jm, km, 0.0);
+    P_graupel.initArray(im, jm, km, 0.0);
+    P_nh3_rain.initArray(im, jm, km, 0.0);
+    P_nh3_snow.initArray(im, jm, km, 0.0);
+    P_nh3_graupel.initArray(im, jm, km, 0.0);
+    P_ch4_rain.initArray(im, jm, km, 0.0);
+    P_ch4_snow.initArray(im, jm, km, 0.0);
+    P_ch4_graupel.initArray(im, jm, km, 0.0);
+    P_nh4sh.initArray(im, jm, km, 0.0);
+    Q_precip.initArray(im, jm, km, 0.0);
+    S_precip_h2o.initArray(im, jm, km, 0.0);
+    S_precip_h2o_cloud.initArray(im, jm, km, 0.0);
+    S_precip_h2o_ice.initArray(im, jm, km, 0.0);
+    S_precip_nh3.initArray(im, jm, km, 0.0);
+    S_precip_nh3_cloud.initArray(im, jm, km, 0.0);
+    S_precip_nh3_ice.initArray(im, jm, km, 0.0);
+    S_precip_ch4.initArray(im, jm, km, 0.0);
+    S_precip_ch4_cloud.initArray(im, jm, km, 0.0);
+    S_precip_ch4_ice.initArray(im, jm, km, 0.0);
+    precip_srf_h2o.initArray_2D(jm, km, 0.0);
+    precip_srf_nh3.initArray_2D(jm, km, 0.0);
+    precip_srf_ch4.initArray_2D(jm, km, 0.0);
+    precip_srf_nh4sh.initArray_2D(jm, km, 0.0);
+    precip_srf_total.initArray_2D(jm, km, 0.0);
     tke.initArray(im, jm, km, 0.0);
     dis.initArray(im, jm, km, 0.0);
     tken.initArray(im, jm, km, 0.0);
