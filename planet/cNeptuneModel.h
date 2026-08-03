@@ -78,6 +78,16 @@ public:
     // about it. ATSAT and ATJUP carry the same accessor.
     static const char* planet_tag(){ return "ATNEPT"; }
 
+    // p_dyn is stored as the NONDIMENSIONAL kinematic pressure, so displaying it in bar needs
+    // r_mix*u_0^2*1e-5. Default OFF (returns 1.0) so the printed number is unchanged; ATNEPT_PDYN_UNITS=1
+    // makes it actually bar. Mirrors ATJUP's accessor of the same name, which is what lets the
+    // pressure row read the same in all three models.
+    double p_dyn_to_bar() const {
+        static const bool on = [](){ const char* e = getenv("ATNEPT_PDYN_UNITS"); return e && atoi(e) != 0; }();
+        return on ? r_mix * u_0 * u_0 * 1.0e-5 : 1.0;
+    }
+
+
     // ---- ATSAT_QHEAT_SCALE / the latent+sensible heating scale ----
     //
     // Returns exactly 1.0 when off, so the default path is bit-identical.
