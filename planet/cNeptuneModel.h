@@ -78,6 +78,25 @@ public:
     // about it. ATSAT and ATJUP carry the same accessor.
     static const char* planet_tag(){ return "ATNEPT"; }
 
+    // ---- ATSAT_QHEAT_SCALE / the latent+sensible heating scale ----
+    //
+    // Returns exactly 1.0 when off, so the default path is bit-identical.
+    //
+    // Thermo_*.cpp forms the heating as  lv * velocity_av * grad(rho) / (L_atm * L_atm), where
+    // velocity_av is built from the RAW NONDIMENSIONAL u,v,w and grad() is per nondimensional
+    // length. The physical volumetric rate is lv * (v . grad rho) in W/m3, which needs u_0 to
+    // make the velocity a speed and ONE division by the length scale IN METRES. The code divides
+    // by the length scale twice, in kilometres. The ratio is u_0 * L_atm / 1e3.
+    //
+    // Q_Latent and Q_Sensible are OUTPUT-ONLY — nothing in RHS_*/RungeKutta_* reads them — so
+    // this changes no physics, but it does change the .vtk/.vts values, which is why it is a knob
+    // and not a silent repair.
+    double qheat_fix() const {
+        static const int on = [](){ const char* e = getenv("ATNEPT_QHEAT_SCALE"); return e ? atoi(e) : 0; }();
+        return on ? u_0 * L_atm / 1.0e3 : 1.0;
+    }
+
+
     // ---- Hooks for the shared FluxLimiter<Planet> (FluxLimiter.h) ----
     //
     // metricRadius() is the established hook for the one place ATSAT and ATJUP genuinely differ

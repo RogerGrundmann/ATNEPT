@@ -113,33 +113,33 @@ void cNeptuneModel::Latent_Heat(){
 
 
                 if(h2o.x[i][j][k] >= q_Rain)  
-                    Q_Latent.x[i][j][k] = lv_h2o * velocity_av * dh2o/(L_atm * L_atm);
+                    Q_Latent.x[i][j][k] = lv_h2o * velocity_av * dh2o/(L_atm * L_atm) * qheat_fix();
                 else  Q_Latent.x[i][j][k] = 0.0;
 
                 if(h2o.x[i][j][k] >= q_Ice)  
-                    Latency_Ice = ls_h2o * velocity_av * dnh3/(L_atm * L_atm);
+                    Latency_Ice = ls_h2o * velocity_av * dnh3/(L_atm * L_atm) * qheat_fix();
                 else  Latency_Ice = 0.0;
 
 
 
                 if(h2s.x[i][j][k] >= q_Rain_h2s)  
                     Q_Latent.x[i][j][k] = Q_Latent.x[i][j][k] + lv_h2s 
-                        * velocity_av * dh2s/(L_atm * L_atm);
+                        * velocity_av * dh2s/(L_atm * L_atm) * qheat_fix();
                 else  Q_Latent.x[i][j][k] = 0.0;
 
                 if(h2s.x[i][j][k] >= q_Ice_h2s)  
-                    Latency_Ice = Latency_Ice + ls_h2s * velocity_av * dh2s/(L_atm * L_atm);
+                    Latency_Ice = Latency_Ice + ls_h2s * velocity_av * dh2s/(L_atm * L_atm) * qheat_fix();
                 else  Latency_Ice = 0.0;
 
 
 
                 if(nh3.x[i][j][k] >= q_Rain_nh3)  
                     Q_Latent.x[i][j][k] = Q_Latent.x[i][j][k] + lv_nh3 
-                        * velocity_av * dnh3/(L_atm * L_atm);
+                        * velocity_av * dnh3/(L_atm * L_atm) * qheat_fix();
                 else  Q_Latent.x[i][j][k] = 0.0;
 
                 if(nh3.x[i][j][k] >= q_Ice_nh3)  
-                    Latency_Ice = Latency_Ice + ls_nh3 * velocity_av * dnh3/(L_atm * L_atm);
+                    Latency_Ice = Latency_Ice + ls_nh3 * velocity_av * dnh3/(L_atm * L_atm) * qheat_fix();
                 else  Latency_Ice = 0.0;
 
 
@@ -149,7 +149,7 @@ void cNeptuneModel::Latent_Heat(){
 
 
                 Q_Sensible.x[i][j][k] = r_mix * cp_mix 
-                    * velocity_av * dtemp * t_ref/(L_atm * L_atm);  // sensible heat in [W/m³] from energy transport equation
+                    * velocity_av * dtemp * t_ref/(L_atm * L_atm) * qheat_fix();  // sensible heat in [W/m³] from energy transport equation
 
 
                 if(SeaMount.x[i][j][k] == 1.0){
