@@ -534,6 +534,10 @@ void cNeptuneModel::resetArrays(){
 
     thermalmassflux.initArray(im, jm, km, 0.0);   // thermal massflux_h2s
 
+    acc_tke.initArray(im, jm, km, 0.0);
+    acc_dis.initArray(im, jm, km, 0.0);
+    rhs_tke.initArray(im, jm, km, 0.0);
+    rhs_dis.initArray(im, jm, km, 0.0);
     acc_t.initArray(im, jm, km, 0.0);
     acc_u.initArray(im, jm, km, 0.0);
     acc_v.initArray(im, jm, km, 0.0);
@@ -641,6 +645,11 @@ void cNeptuneModel::restoreVar(double coeff){
                 // and nothing allocated it, while steadyQuery's pressure case sat commented
                 // out because of that. It belongs with the other n-copies.
                 p_dynn.x[i][j][k] = coeff * p_dyn.x[i][j][k];
+                // k* and dis* take the same start-of-step copies the other prognostic fields
+                // get; without them the RK4 stages would integrate from a moving base. With the
+                // closure off both fields are identically zero, so these are zero too.
+                tken.x[i][j][k] = coeff * tke.x[i][j][k];
+                disn.x[i][j][k] = coeff * dis.x[i][j][k];
                 tn.x[i][j][k] = coeff * t.x[i][j][k];
                 un.x[i][j][k] = coeff * u.x[i][j][k];
                 vn.x[i][j][k] = coeff * v.x[i][j][k];

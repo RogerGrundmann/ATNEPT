@@ -39,6 +39,8 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
     double dh2odr, dh2ocdr, dh2oidr;
     double dh2sdr, dh2scdr, dh2sidr;
     double dnh3dr, dnh3cdr, dnh3idr, dnh4shdr;
+    double dtkedr, ddisdr, dtkedthe, ddisdthe, dtkedphi, ddisdphi;
+    double d2tkedr2, d2disdr2, d2tkedthe2, d2disdthe2, d2tkedphi2, d2disdphi2;
 
     double dudthe, dvdthe, dwdthe, dtdthe, dpdthe;
     double dch4dthe, dch4cdthe, dch4idthe;
@@ -94,6 +96,8 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
     COMPUTE_DR(nh3_cloud, dnh3cdr, d2nh3cdr2)
     COMPUTE_DR(nh3_ice,   dnh3idr, d2nh3idr2)
     COMPUTE_DR(nh4sh,     dnh4shdr,d2nh4shdr2)
+    COMPUTE_DR(tke,       dtkedr, d2tkedr2)
+    COMPUTE_DR(dis,       ddisdr, d2disdr2)
     dpdr = (p_dyn.x[i+1][j][k] - p_dyn.x[i-1][j][k]) * inv_2dr;
     #undef COMPUTE_DR
 
@@ -120,6 +124,8 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
     COMPUTE_DTHE(nh3_cloud, dnh3cdthe, d2nh3cdthe2)
     COMPUTE_DTHE(nh3_ice,   dnh3idthe, d2nh3idthe2)
     COMPUTE_DTHE(nh4sh,     dnh4shdthe,d2nh4shdthe2)
+    COMPUTE_DTHE(tke,       dtkedthe, d2tkedthe2)
+    COMPUTE_DTHE(dis,       ddisdthe, d2disdthe2)
     dpdthe = (p_dyn.x[i][j+1][k] - p_dyn.x[i][j-1][k]) * inv_2dthe;
     #undef COMPUTE_DTHE
 
@@ -146,6 +152,8 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
     COMPUTE_DPHI(nh3_cloud, dnh3cdphi, d2nh3cdphi2)
     COMPUTE_DPHI(nh3_ice,   dnh3idphi, d2nh3idphi2)
     COMPUTE_DPHI(nh4sh,     dnh4shdphi,d2nh4shdphi2)
+    COMPUTE_DPHI(tke,       dtkedphi, d2tkedphi2)
+    COMPUTE_DPHI(dis,       ddisdphi, d2disdphi2)
     dpdphi = (p_dyn.x[i][j][k+1] - p_dyn.x[i][j][k-1]) * inv_2dphi;
     #undef COMPUTE_DPHI
 
@@ -365,6 +373,48 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
         + diffusion_nh4sh / (sc_nh4sh * re)
         + chemical_reaction * massflux_nh4sh.x[i][j][k]
         + (v_stokes_nh4sh / u_0) * dnh4shdr;
+
+    /*
+     * k* and dis* become PROGNOSTIC here — stage two of the turbulence port.
+     *
+     * Transport + diffusion + the closure's own source terms, the standard k-omega transport
+     * equations. sig_k and sig_w are the transport Prandtl numbers of the closure, not derived
+     * from it; TurbulenceNept carries its own sig_w2 for the SST cross-diffusion.
+     *
+     * With the closure OFF this block is skipped and both tendencies are zeroed, so the
+     * integrator leaves k* and dis* exactly where they were — which is what makes ATNEPT_TURB
+     * unset byte-identical.
+     */
+    if(turb_active){
+        constexpr double sig_k = 0.85, sig_w = 0.5;
+        const double nue_here = nue.x[i][j][k];
+
+        const double transport_tke = u.x[i][j][k] * dtkedr
+                                   + v.x[i][j][k] * dtkedthe * geo.inv_rm
+                                   + w.x[i][j][k] * dtkedphi * geo.inv_rmsinthe;
+        const double transport_dis = u.x[i][j][k] * ddisdr
+                                   + v.x[i][j][k] * ddisdthe * geo.inv_rm
+                                   + w.x[i][j][k] * ddisdphi * geo.inv_rmsinthe;
+
+        const double diffusion_tke = d2tkedr2 + dtkedr * 2.0 * geo.inv_rm
+                                   + d2tkedthe2 * geo.inv_rm2
+                                   + dtkedthe * geo.costhe_inv_rm2sinthe
+                                   + d2tkedphi2 * geo.inv_rm2sinthe2;
+        const double diffusion_dis = d2disdr2 + ddisdr * 2.0 * geo.inv_rm
+                                   + d2disdthe2 * geo.inv_rm2
+                                   + ddisdthe * geo.costhe_inv_rm2sinthe
+                                   + d2disdphi2 * geo.inv_rm2sinthe2;
+
+        rhs_tke.x[i][j][k] = - transport_tke
+                           + diffusion_tke * (1.0/re + nue_here/sig_k)
+                           + tke_source.x[i][j][k];
+        rhs_dis.x[i][j][k] = - transport_dis
+                           + diffusion_dis * (1.0/re + nue_here/sig_w)
+                           + dis_source.x[i][j][k];
+    } else {
+        rhs_tke.x[i][j][k] = 0.0;
+        rhs_dis.x[i][j][k] = 0.0;
+    }
 
     aux_u.x[i][j][k] = rhs_u.x[i][j][k] + dpdr_term;
     aux_v.x[i][j][k] = rhs_v.x[i][j][k] + dpdthe_term;

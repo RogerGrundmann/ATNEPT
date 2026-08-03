@@ -24,6 +24,13 @@ void cNeptuneModel::RungeKuttaNept(){
     const double inv_dthe2 = 1.0 / (dthe * dthe);
     const double inv_dphi2 = 1.0 / (dphi * dphi);
 
+    // Turbulence clamps, used only when the closure is on. k* has a physical ceiling; dis* has a
+    // FLOOR because it appears in denominators throughout the closure (nue = k/dis among them) and
+    // a zero there is an infinity one step later.
+    const bool turb_on_rk = turb_active;
+    const double tke_max_nd = 1000.0 / (u_0 * u_0);   // 1000 m2/s2
+    constexpr double dis_min_nd = 1.0e-10;            // matches the closure's dis_min
+
     const double t_min = 0.1;   // ~7.6 K physical (prevents buoyancy blow-up)
     const double t_max = 10.0;  // ~760 K physical
 
@@ -85,6 +92,12 @@ void cNeptuneModel::RungeKuttaNept(){
         for(int i = 1; i < im-1; i++){
             for(int j = 1; j < jm-1; j++){
                 for(int k = 1; k < km-1; k++){
+                    if(turb_on_rk){
+                        acc_tke.x[i][j][k] = (stage == 0) ? wgt * rhs_tke.x[i][j][k]
+                                           : acc_tke.x[i][j][k] + wgt * rhs_tke.x[i][j][k];
+                        acc_dis.x[i][j][k] = (stage == 0) ? wgt * rhs_dis.x[i][j][k]
+                                           : acc_dis.x[i][j][k] + wgt * rhs_dis.x[i][j][k];
+                    }
                     acc_t.x[i][j][k] = (stage == 0) ? wgt * rhs_t.x[i][j][k]
                                        : acc_t.x[i][j][k] + wgt * rhs_t.x[i][j][k];
                     acc_u.x[i][j][k] = (stage == 0) ? wgt * rhs_u.x[i][j][k]
@@ -122,6 +135,12 @@ void cNeptuneModel::RungeKuttaNept(){
 
                     if(stage < 3){
                         t.x[i][j][k] = tn.x[i][j][k] + c_in * rhs_t.x[i][j][k];
+                        if(turb_on_rk){
+                            tke.x[i][j][k] = AtomUtils::clamp(tken.x[i][j][k]
+                                + c_in * rhs_tke.x[i][j][k], 0.0, tke_max_nd);
+                            dis.x[i][j][k] = std::max(disn.x[i][j][k]
+                                + c_in * rhs_dis.x[i][j][k], dis_min_nd);
+                        }
                         u.x[i][j][k] = un.x[i][j][k] + c_in * rhs_u.x[i][j][k];
                         v.x[i][j][k] = vn.x[i][j][k] + c_in * rhs_v.x[i][j][k];
                         w.x[i][j][k] = wn.x[i][j][k] + c_in * rhs_w.x[i][j][k];
@@ -151,6 +170,12 @@ void cNeptuneModel::RungeKuttaNept(){
             for(int k = 1; k < km-1; k++){
                 t.x[i][j][k] = AtomUtils::clamp(
                     tn.x[i][j][k] + dt * acc_t.x[i][j][k] / 6.0, t_min, t_max);
+                if(turb_on_rk){
+                    tke.x[i][j][k] = AtomUtils::clamp(std::max(tken.x[i][j][k]
+                        + dt * acc_tke.x[i][j][k] / 6.0, 0.0), 0.0, tke_max_nd);
+                    dis.x[i][j][k] = std::max(disn.x[i][j][k]
+                        + dt * acc_dis.x[i][j][k] / 6.0, dis_min_nd);
+                }
                 u.x[i][j][k] = un.x[i][j][k] + dt * acc_u.x[i][j][k] / 6.0;
                 v.x[i][j][k] = vn.x[i][j][k] + dt * acc_v.x[i][j][k] / 6.0;
                 w.x[i][j][k] = wn.x[i][j][k] + dt * acc_w.x[i][j][k] / 6.0;

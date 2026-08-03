@@ -138,6 +138,8 @@ public:
     // These are declared and allocated now, inert, so that the integrator rewrite is a change to
     // one file. ATSAT fixed the same defect the same way in 71082e7 and became reproducible at any
     // thread count; that is the acceptance test this is aiming at.
+    Array acc_tke;              // RK4 accumulator for k*
+    Array acc_dis;              // RK4 accumulator for dis*
     Array acc_t;
     Array acc_u;
     Array acc_v;
@@ -156,6 +158,8 @@ public:
     Array acc_nh3_ice;
     Array acc_nh4sh;
 
+    Array rhs_tke;              // tendency of k*,   assembled in RHS_Nept
+    Array rhs_dis;              // tendency of dis*, assembled in RHS_Nept
     Array tke;                  // turbulent kinetic energy k*      [dimensionless]
     Array dis;                  // dissipation eps* or omega*       [dimensionless]
     Array tken;                 // k* at the start of the RK4 step
