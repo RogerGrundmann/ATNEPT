@@ -534,6 +534,23 @@ void cNeptuneModel::resetArrays(){
 
     thermalmassflux.initArray(im, jm, km, 0.0);   // thermal massflux_h2s
 
+    acc_t.initArray(im, jm, km, 0.0);
+    acc_u.initArray(im, jm, km, 0.0);
+    acc_v.initArray(im, jm, km, 0.0);
+    acc_w.initArray(im, jm, km, 0.0);
+    acc_ch4.initArray(im, jm, km, 0.0);
+    acc_ch4_cloud.initArray(im, jm, km, 0.0);
+    acc_ch4_ice.initArray(im, jm, km, 0.0);
+    acc_h2o.initArray(im, jm, km, 0.0);
+    acc_h2o_cloud.initArray(im, jm, km, 0.0);
+    acc_h2o_ice.initArray(im, jm, km, 0.0);
+    acc_h2s.initArray(im, jm, km, 0.0);
+    acc_h2s_cloud.initArray(im, jm, km, 0.0);
+    acc_h2s_ice.initArray(im, jm, km, 0.0);
+    acc_nh3.initArray(im, jm, km, 0.0);
+    acc_nh3_cloud.initArray(im, jm, km, 0.0);
+    acc_nh3_ice.initArray(im, jm, km, 0.0);
+    acc_nh4sh.initArray(im, jm, km, 0.0);
     tke.initArray(im, jm, km, 0.0);
     dis.initArray(im, jm, km, 0.0);
     tken.initArray(im, jm, km, 0.0);

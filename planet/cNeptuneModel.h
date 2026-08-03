@@ -127,6 +127,35 @@ public:
     //
     // tken/disn exist now so the prognostic stage has the start-of-step copies it will need
     // without a second pass over this header.
+    // ---- RK4 stage accumulators, for the separated integrator ----
+    //
+    // The running sum k1 + 2k2 + 2k3 + k4 needs a place to live once the four stages stop sharing
+    // one cell loop. RungeKutta_Nept currently runs all four stages inside a single parallel loop
+    // over cells, holding k1..k4 as per-thread scalars, while RHSNept differentiates t,u,v,w at
+    // i+-1, j+-1, k+-1 — cells other threads are simultaneously overwriting. That is why two runs
+    // of the same binary at 24 threads differ in 4 of 7 output files, measured.
+    //
+    // These are declared and allocated now, inert, so that the integrator rewrite is a change to
+    // one file. ATSAT fixed the same defect the same way in 71082e7 and became reproducible at any
+    // thread count; that is the acceptance test this is aiming at.
+    Array acc_t;
+    Array acc_u;
+    Array acc_v;
+    Array acc_w;
+    Array acc_ch4;
+    Array acc_ch4_cloud;
+    Array acc_ch4_ice;
+    Array acc_h2o;
+    Array acc_h2o_cloud;
+    Array acc_h2o_ice;
+    Array acc_h2s;
+    Array acc_h2s_cloud;
+    Array acc_h2s_ice;
+    Array acc_nh3;
+    Array acc_nh3_cloud;
+    Array acc_nh3_ice;
+    Array acc_nh4sh;
+
     Array tke;                  // turbulent kinetic energy k*      [dimensionless]
     Array dis;                  // dissipation eps* or omega*       [dimensionless]
     Array tken;                 // k* at the start of the RK4 step
