@@ -375,6 +375,18 @@ void cNeptuneModel::Run(){
         BC_Nept(*this).bcTheta();                                       // extrapolation in j-direction along grid boundaries
         BC_Nept(*this).bcPhi();                                         // extrapolation in k-direction along grid boundaries
 
+        // How far the run is from a steady state, and WHERE. MUST run BEFORE restoreVar: it
+        // differences each field against the n-copy restoreVar is about to overwrite, so after
+        // that call every number it prints is identically zero. That is the reason it was never
+        // called from anywhere useful, and the reason it is called here.
+        //
+        // Same cadence as printMinMax. ATNEPT_STEADY=0 switches it off. This ADDS LINES TO THE
+        // LOG that ATNEPT has never printed — the routine has never run in this model — but it
+        // writes nothing and changes no output file.
+        static const int steady_on = [](){
+            const char* e = getenv("ATNEPT_STEADY"); return e ? atoi(e) : 1; }();
+        if(steady_on && iter_n % checkpoint == 0) steadyQuery();
+
         restoreVar(1.0);
 
         // After the state has been advanced and the boundaries applied: put any
@@ -477,6 +489,7 @@ void cNeptuneModel::resetArrays(){
     thermalmassflux.initArray(im, jm, km, 0.0);   // thermal massflux_h2s
 
     p_dyn.initArray(im, jm, km, pa);                // dynamic pressure
+    p_dynn.initArray(im, jm, km, pa);               // dynamic pressure, previous iteration
     p_stat.initArray(im, jm, km, pa);                // static pressure
     rho_mix.initArray(im, jm, km, 0.0);          // local mixture density
 
@@ -548,6 +561,10 @@ void cNeptuneModel::restoreVar(double coeff){
     for(int i = 0; i < im; i++){
         for(int j = 0; j < jm; j++){
             for(int k = 0; k < km; k++){
+                // p_dynn is the previous-iteration dynamic pressure. Nothing maintained it
+                // and nothing allocated it, while steadyQuery's pressure case sat commented
+                // out because of that. It belongs with the other n-copies.
+                p_dynn.x[i][j][k] = coeff * p_dyn.x[i][j][k];
                 tn.x[i][j][k] = coeff * t.x[i][j][k];
                 un.x[i][j][k] = coeff * u.x[i][j][k];
                 vn.x[i][j][k] = coeff * v.x[i][j][k];

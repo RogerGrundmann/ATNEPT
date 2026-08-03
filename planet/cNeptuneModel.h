@@ -58,6 +58,7 @@ class cNeptuneModel{
     template<class M> friend class FluxLimiter;
     template<class M> friend class SaturationAdjustment;
     template<class M> friend class PressureSolver;
+    template<class M> friend class Reporting;
     friend class BC_Nept;
     friend class ChemistryNept;
     friend class SaturationAdjustmentNept;
@@ -90,6 +91,37 @@ public:
             const char* e = getenv("ATNEPT_METRIC_RADIUS"); return e ? atof(e) : 0.0; }();
         if(!(R_km > 0.0)) return rm;
         return rm + (R_km / L_atm - 1.0);
+    }
+
+    // ---- Hooks for the shared Reporting<Planet> (Reporting.h) ----
+
+    // ATJUP flips cos(theta) in the southern hemisphere for the continuity residual; ATSAT and
+    // ATNEPT never have. Same knob shape as ATJUP's, so the three models answer one question
+    // rather than differ by a missing line. Default off = unchanged.
+    static bool costhe_abs(){
+        static const bool v = [](){ const char* e = getenv("ATNEPT_COSTHE_ABS"); return e && atoi(e) != 0; }();
+        return v;
+    }
+
+    // Column layout of the min/max report. ATNEPT uses the same widths ATSAT does — 6 for the
+    // unit column, ten spaces between the max and min halves. ATJUP widened its unit column to 12
+    // and uses three spaces, because its unit strings are longer.
+    static int minmax_unit_width()      { return 6; }
+    static const char *minmax_separator(){ return "          "; }
+
+    static const char *steady_heading(){
+        return " 3D iterational process for the surface boundary conditions\n printout of maximum and minimum absolute and relative errors of the computed values at their locations: level, latitude, longitude";
+    }
+
+    // The iteration line of the steady-state header, including its trailing newline.
+    //
+    // THIS PRINTS iter_n, NOT n, AND THAT IS A CORRECTION. ATNEPT's steadyQuery printed `n`, a
+    // member that is DECLARED AND NEVER ASSIGNED ANYWHERE in this model — the iteration loop
+    // counts with iter_n. It therefore printed stack garbage (observed: "n = 2185456" on a run
+    // whose nm was 2). Nobody had seen it because nothing called the routine. ATJUP genuinely
+    // counts with n and prints it; ATSAT and now ATNEPT use iter_n.
+    std::string steady_iter_line() const {
+        return "      n = " + std::to_string(iter_n) + "\n";
     }
 
     // ---- What the SHARED PressureSolver.h asks of this model ----
@@ -704,6 +736,10 @@ private:
     Array cloudiness_nh3; // cloudiness, N in literature
 
     Array p_dyn;                // dynamic pressure
+    // Previous-iteration dynamic pressure, the n-copy of p_dyn. It did not exist at all
+    // until steadyQuery was revived: the routine's pressure case was commented out, its
+    // accumulators with it. Maintained by restoreVar with the other n-copies.
+    Array p_dynn;               // dynamic pressure, previous iteration
     Array p_stat;                // static pressure
 
     Array rhs_t;                // auxilliar field RHS temperature
