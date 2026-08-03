@@ -56,6 +56,7 @@ class cNeptuneModel{
     template<class M> friend class ParaViewWriter;
     template<class M> friend class ConvectiveAdjustment;
     template<class M> friend class FluxLimiter;
+    template<class M> friend class SaturationAdjustment;
     friend class BC_Nept;
     friend class ChemistryNept;
     friend class SaturationAdjustmentNept;
@@ -89,6 +90,32 @@ public:
         if(!(R_km > 0.0)) return rm;
         return rm + (R_km / L_atm - 1.0);
     }
+
+    // ---- What the SHARED SaturationAdjustment.h asks of this model ----
+
+    // Neptune contains no solid obstacle: it is a gas giant modelled as a spherical shell, and
+    // nothing in ATNEPT marks a cell as ground. ATSAT answers the same question the same way;
+    // only ATJUP has an obstacle, and only for its seamount experiments.
+    bool is_solid(int, int, int) const { return false; }
+
+    // The density the adjustment divides by. ATNEPT_LOCAL_RHO=1 uses the LOCAL mixture density
+    // where it is usable and falls back to the constant r_mix where it is not — which matters
+    // because rho_mix is zero until computeMixtureDensity has run, and a zero here would divide
+    // through the whole adjustment. Default 0 = the constant r_mix everywhere, which is what
+    // ATNEPT has always used. Exactly ATSAT's and ATJUP's rho_at().
+    double rho_at(int i, int j, int k){
+        static const int local = [](){
+            const char* e = getenv("ATNEPT_LOCAL_RHO"); return e ? atoi(e) : 0; }();
+        if(!local) return r_mix;
+        const double rho = rho_mix.x[i][j][k];
+        return (rho > 0.0 && std::isfinite(rho)) ? rho : r_mix;
+    }
+
+    // Whether the shared adjustment writes the static pressure back after condensing. ATSAT says
+    // true; ATNEPT's own routine does not touch p_stat, so it says false and the shared algorithm
+    // leaves the field alone — one of the two models' behaviours had to be named rather than
+    // assumed.
+    static bool satadj_updates_pstat(){ return false; }
 
     // The model's own floor on sin(theta) in the METRIC. ATNEPT declares none, as ATSAT does not;
     // it exists so ATPhys::polar_divisor_floor<Planet>() compiles. With ATNEPT_SINTHE_TRACK unset
