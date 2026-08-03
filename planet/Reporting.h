@@ -139,9 +139,103 @@ public:
 
     explicit Reporting(Planet &m_) : m(m_) {}
 
+
+    /*
+     * The min/max report's COMMON LIST — the 39 fields every model carries, in one place.
+     *
+     * This could not be shared until the units were settled, and they disagreed on 35 of these 39
+     * rows: a species density counted twice, W/m2 against W/m3, four force prefixes, three
+     * readings of thermalmassflux, and a temperature scaled by 273.15 instead of t_ref. Each was
+     * settled on its own terms in its own commit; what is left is a list the three models agree
+     * on, so it lives here.
+     *
+     * NOT here: each planet's own fields. ATSAT and ATJUP print radiation, turbulence and
+     * precipitation arrays ATNEPT has none of; ATNEPT prints rho_mix and an H2S condensate pair
+     * the others lack. Each model calls this and then prints its own, which is why the report now
+     * has ONE ORDER everywhere — shared sections first, the planet's own after. That reordering is
+     * the only visible change to any log.
+     */
+    void print_minmax_common(){
+        std::cout << std::endl << std::endl << " Courant time step   dt = " << m.dt
+                  << std::endl << std::endl;
+
+        std::cout << std::endl << std::endl << " Temperatures " << std::endl;
+        searchMinMax_3D(" max 3D temperature ", " min 3D temperature ", " degC",
+            m.t, m.t_ref, [](double i)->double{return i - 273.15;}, true);
+        searchMinMax_3D(" max 3D thermalflux ", " min 3D thermalflux ", " W/m3", m.thermalmassflux, 1.0);
+        std::cout << std::endl;
+
+        std::cout << std::endl << " Velocities " << std::endl;
+        searchMinMax_3D(" max 3D u-component ", " min 3D u-component ", " m/s", m.u, m.u_0);
+        searchMinMax_3D(" max 3D v-component ", " min 3D v-component ", " m/s", m.v, m.u_0);
+        searchMinMax_3D(" max 3D w-component ", " min 3D w-component ", " m/s", m.w, m.u_0);
+        std::cout << std::endl;
+
+        std::cout << std::endl << " Pressures " << std::endl;
+        searchMinMax_3D(" max 3D pressure dynamic ", " min 3D pressure dynamic ", " bar", m.p_dyn, m.p_dyn_to_bar());
+        searchMinMax_3D(" max 3D pressure static ", " min 3D pressure static ", " bar", m.p_stat, 1.0);
+        std::cout << std::endl;
+
+        std::cout << std::endl << " Water " << std::endl;
+        searchMinMax_3D(" max 3D h2o ",  " min 3D h2o ", " kg/m3", m.h2o, 1.0);
+        searchMinMax_3D(" max 3D h2o_cloud ", " min 3D h2o_cloud ", " kg/m3", m.h2o_cloud, 1.0);
+        searchMinMax_3D(" max 3D h2o_ice ", " min 3D h2o_ice ", " kg/m3", m.h2o_ice, 1.0);
+        std::cout << std::endl;
+
+        std::cout << std::endl << " Methane " << std::endl;
+        searchMinMax_3D(" max 3D ch4 ",  " min 3D ch4 ", " kg/m3", m.ch4, 1.0);
+        searchMinMax_3D(" max 3D ch4_cloud ", " min 3D ch4_cloud ", " kg/m3", m.ch4_cloud, 1.0);
+        searchMinMax_3D(" max 3D ch4_ice ", " min 3D ch4_ice ", " kg/m3", m.ch4_ice, 1.0);
+        std::cout << std::endl;
+
+        std::cout << std::endl << " Hydrogen Sulfide " << std::endl;
+        searchMinMax_3D(" max 3D h2s ",  " min 3D h2s ", " kg/m3", m.h2s, 1.0);
+        searchMinMax_3D(" max 3D w_h2s ", " min 3D w_h2s ", " kg/(m3s)", m.w_h2s, 1.0);
+        searchMinMax_3D(" max 3D j_h2s ", " min 3D j_h2s ", " kg/m4", m.j_h2s, 1.0);
+        searchMinMax_3D(" max 3D jT_h2s ", " min 3D jT_h2s ", " kg/m4", m.jT_h2s, 1.0);
+        searchMinMax_3D(" max 3D massflux_h2s ", " min 3D massflux_h2s ", " kg/(m3s)", m.massflux_h2s, 1.0);
+        searchMinMax_3D(" max 3D diff_h2s ", " min 3D diff_h2s ", " kg/(m3s)", m.difflux_h2s, 1.0);
+        std::cout << std::endl;
+
+        std::cout << std::endl << " Ammonia " << std::endl;
+        searchMinMax_3D(" max 3D nh3 ",  " min 3D nh3 ", " kg/m3", m.nh3, 1.0);
+        searchMinMax_3D(" max 3D nh3_cloud ", " min 3D nh3_cloud ", " kg/m3", m.nh3_cloud, 1.0);
+        searchMinMax_3D(" max 3D nh3_ice ", " min 3D nh3_ice ", " kg/m3", m.nh3_ice, 1.0);
+        searchMinMax_3D(" max 3D w_nh3 ", " min 3D w_nh3 ", " kg/(m3s)", m.w_nh3, 1.0);
+        searchMinMax_3D(" max 3D j_nh3 ", " min 3D j_nh3 ", " kg/m4", m.j_nh3, 1.0);
+        searchMinMax_3D(" max 3D jT_nh3 ", " min 3D jT_nh3 ", " kg/m4", m.jT_nh3, 1.0);
+        searchMinMax_3D(" max 3D massflux_nh3 ", " min 3D massflux_nh3 ", " kg/(m3s)", m.massflux_nh3, 1.0);
+        searchMinMax_3D(" max 3D diff_nh3 ", " min 3D diff_nh3 ", " kg/(m3s)", m.difflux_nh3, 1.0);
+        std::cout << std::endl;
+
+        std::cout << std::endl << " Ammonia Hydrosulfide " << std::endl;
+        searchMinMax_3D(" max 3D nh4sh ",  " min 3D nh4sh ", " mg/m3", m.nh4sh, 1e6);
+        searchMinMax_3D(" max 3D w_nh4sh ", " min 3D w_nh4sh ", " mg/(m3s)", m.w_nh4sh, 1e6);
+        searchMinMax_3D(" max 3D j_nh4sh ", " min 3D j_nh4sh ", " mg/m4", m.j_nh4sh, 1e6);
+        searchMinMax_3D(" max 3D jT_nh4sh ", " min 3D jT_nh4sh ", " mg/m4", m.jT_nh4sh, 1e6);
+        searchMinMax_3D(" max 3D massflux_nh4sh ", " min 3D massflux_nh4sh ", " mg/(m3s)", m.massflux_nh4sh, 1e6);
+        searchMinMax_3D(" max 3D diff_nh4sh ", " min 3D diff_nh4sh ", " mg/(m3s)", m.difflux_nh4sh, 1e6);
+        std::cout << std::endl;
+
+        std::cout << std::endl << " Forces " << std::endl;
+        searchMinMax_3D(" max 3D Coriolis force ", " min 3D Coriolis force ", " mN/m3", m.CoriolisForce, 1e3);
+        searchMinMax_3D(" max 3D centrifugal force ", " min 3D centrifugal force ", " mN/m3", m.CentrifugalForce, 1e3);
+        searchMinMax_3D(" max 3D buoyancy force ", " min 3D buoyancy force ", " N/m3", m.BuoyancyForce, 1.0);
+        searchMinMax_3D(" max 3D presgrad force ", " min 3D presgrad force ", " N/m3", m.PresGradForce, 1.0);
+        std::cout << std::endl;
+
+        std::cout << std::endl << " Energies " << std::endl;
+        searchMinMax_3D(" max 3D sensible heat ", " min 3D sensible heat ", " W/m3", m.Q_Sensible, 1.0);
+        searchMinMax_3D(" max 3D latent heat ", " min 3D latent heat ", " W/m3", m.Q_Latent, 1.0);
+        std::cout << std::endl;
+    }
+
+    // The lambda and print_heading default exactly as the models' own member versions do, so a
+    // row that needs neither reads as five arguments here too.
     void searchMinMax_3D(std::string name_maxValue, std::string name_minValue,
         std::string name_unitValue, Array &value_D, double coeff,
-        std::function< double(double) > lambda, bool print_heading)
+        std::function< double(double) > lambda = [](double i)->double{ return i; },
+        bool print_heading = false)
     {
         static const std::string heading_1 = " printout of maximum and minimum values of properties at their locations: latitude, longitude, level";
         static const std::string heading_2 = " results based on three dimensional considerations of the problem";
