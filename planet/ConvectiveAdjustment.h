@@ -229,7 +229,20 @@ inline void ConvectiveAdjustment<Model>::run(){
 
             for(int i = i0; i <= i1; i++) m.t.x[i][j][k] = t_col[i];
 
-            n_columns_adjusted++;
+            // COUNT ONLY COLUMNS THAT WERE ACTUALLY MIXED. This was unconditional, so it
+            // counted every column that reached here — i.e. every column whose weights passed the
+            // finiteness guard above, adjusted or not. The variable is named
+            // n_columns_adjusted and the report prints it as "N of M columns (P %)", so the
+            // percentage read as "how much of the model is convectively unstable" when it meant
+            // "how much of the model has usable weights".
+            //
+            // On ATNEPT that printed 100.00 %, which survived a neutral initial profile, the
+            // physics block not running on odd iterations, and the removal of a temperature clamp
+            // — because it was jm*km and never varied. On ATSAT it prints 97.79 %, the 2.21 %
+            // shortfall being columns that fail the weights guard rather than stable ones.
+            //
+            // layers_mixed and the max dT are the honest signals and were always right.
+            if(layers_mixed > 0) n_columns_adjusted++;
             n_layers_mixed += layers_mixed;
             if(passes > max_passes_used) max_passes_used = passes;
         }
