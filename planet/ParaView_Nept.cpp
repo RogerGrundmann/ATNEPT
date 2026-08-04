@@ -25,7 +25,11 @@ void cNeptuneModel::paraview_panorama_vts(int n){
     // Header, coordinates, the Velocity array and the Temperature array are the
     // SHARED ParaViewWriter.h. What stays here is the field list below and the
     // scalars string that has to agree with it.
-    double r_mix_plus = r_mix * 1e6;
+    // kg/m3 -> mg/m3, and NOT r_mix * 1e6 as it was. The species arrays ARE densities, so the old
+    // form multiplied by the mixture density a second time (ATSAT 12397e3, ATNEPT's own 816931f —
+    // which settled the REPORT and left these lists alone). NH4SH keeps a factor of its own while
+    // the rest of the list passes 1.0 because mg/m3 is the unit the shared report prints it in.
+    const double to_mg = 1e6;
     ParaViewWriter<cNeptuneModel> pv(*this);
     ofstream Neptune_panorama_vts_File = pv.open_panorama(n,
         "Temperature PressureDynamic PressureStatic NH3 NH3Cloud NH3Ice H2O H2OCloud H2OIce Q_Latent Q_Sensible BuoyancyForce ");
@@ -43,17 +47,17 @@ void cNeptuneModel::paraview_panorama_vts(int n){
     dump_array("BuoyancyForce", BuoyancyForce, 1.0, Neptune_panorama_vts_File);
 
 
-    dump_array("H2O", h2o, r_mix, Neptune_panorama_vts_File);
-    dump_array("H2OCloud", h2o_cloud, r_mix, Neptune_panorama_vts_File);
-    dump_array("H2OIce", h2o_ice, r_mix, Neptune_panorama_vts_File);
+    dump_array("H2O", h2o, 1.0, Neptune_panorama_vts_File);
+    dump_array("H2OCloud", h2o_cloud, 1.0, Neptune_panorama_vts_File);
+    dump_array("H2OIce", h2o_ice, 1.0, Neptune_panorama_vts_File);
 
-    dump_array("CH4", ch4, r_mix, Neptune_panorama_vts_File);
-    dump_array("CH4Cloud", ch4_cloud, r_mix, Neptune_panorama_vts_File);
-    dump_array("CH4Ice", ch4_ice, r_mix, Neptune_panorama_vts_File);
+    dump_array("CH4", ch4, 1.0, Neptune_panorama_vts_File);
+    dump_array("CH4Cloud", ch4_cloud, 1.0, Neptune_panorama_vts_File);
+    dump_array("CH4Ice", ch4_ice, 1.0, Neptune_panorama_vts_File);
 
-    dump_array("H2S", h2s, r_mix, Neptune_panorama_vts_File);
-    dump_array("H2SCloud", h2s_cloud, r_mix, Neptune_panorama_vts_File);
-    dump_array("H2SIce", h2s_ice, r_mix, Neptune_panorama_vts_File);
+    dump_array("H2S", h2s, 1.0, Neptune_panorama_vts_File);
+    dump_array("H2SCloud", h2s_cloud, 1.0, Neptune_panorama_vts_File);
+    dump_array("H2SIce", h2s_ice, 1.0, Neptune_panorama_vts_File);
     dump_array("w_h2s", w_h2s, 1.0, Neptune_panorama_vts_File);
 //    dump_array("j_h2s", j_h2s, 1.0, Neptune_panorama_vts_File);
 //    dump_array("jT_h2s", jT_h2s, 1.0, Neptune_panorama_vts_File);
@@ -65,8 +69,8 @@ void cNeptuneModel::paraview_panorama_vts(int n){
 //    dump_array("j_nh3", j_nh3, 1.0, Neptune_panorama_vts_File);
 //    dump_array("jT_nh3", jT_nh3, 1.0, Neptune_panorama_vts_File);
 
-    dump_array("NH4SH", nh4sh, r_mix_plus, Neptune_panorama_vts_File);
-    dump_array("w_nh4sh", w_nh4sh, r_mix_plus, Neptune_panorama_vts_File);
+    dump_array("NH4SH", nh4sh, to_mg, Neptune_panorama_vts_File);
+    dump_array("w_nh4sh", w_nh4sh, to_mg, Neptune_panorama_vts_File);
 //    dump_array("j_nh4sh", j_nh4sh, 1.0, Neptune_panorama_vts_File);
 //    dump_array("jT_nh4sh", jT_nh4sh, 1.0, Neptune_panorama_vts_File);
 
@@ -81,7 +85,11 @@ void cNeptuneModel::paraview_panorama_vts(int n){
 */
 void cNeptuneModel::paraview_vtk_radial(int n, int i_radial){
     using namespace ParaViewIO;
-    double r_mix_plus = r_mix * 1e6;
+    // kg/m3 -> mg/m3, and NOT r_mix * 1e6 as it was. The species arrays ARE densities, so the old
+    // form multiplied by the mixture density a second time (ATSAT 12397e3, ATNEPT's own 816931f —
+    // which settled the REPORT and left these lists alone). NH4SH keeps a factor of its own while
+    // the rest of the list passes 1.0 because mg/m3 is the unit the shared report prints it in.
+    const double to_mg = 1e6;
     ofstream Neptune_vtk_radial_File = ParaViewWriter<cNeptuneModel>(*this)
         .open_slice("radial", "Radial", i_radial, n, km, jm, 0.1, false);
     const double z = 0.0;   // out-of-plane component of the in-plane vector below
@@ -98,38 +106,38 @@ void cNeptuneModel::paraview_vtk_radial(int n, int i_radial){
 
     dump_radial("thermalmassflux", thermalmassflux, 1.0, i_radial, Neptune_vtk_radial_File);
 
-    dump_radial("H2O", h2o, r_mix, i_radial, Neptune_vtk_radial_File);
-    dump_radial("H2OCloud", h2o_cloud, r_mix, i_radial, Neptune_vtk_radial_File);
-    dump_radial("H2OIce", h2o_ice, r_mix, i_radial, Neptune_vtk_radial_File);
+    dump_radial("H2O", h2o, 1.0, i_radial, Neptune_vtk_radial_File);
+    dump_radial("H2OCloud", h2o_cloud, 1.0, i_radial, Neptune_vtk_radial_File);
+    dump_radial("H2OIce", h2o_ice, 1.0, i_radial, Neptune_vtk_radial_File);
 
-    dump_radial("CH4", ch4, r_mix, i_radial, Neptune_vtk_radial_File);
-    dump_radial("CH4Cloud", ch4_cloud, r_mix, i_radial, Neptune_vtk_radial_File);
-    dump_radial("CH4Ice", ch4_ice, r_mix, i_radial, Neptune_vtk_radial_File);
+    dump_radial("CH4", ch4, 1.0, i_radial, Neptune_vtk_radial_File);
+    dump_radial("CH4Cloud", ch4_cloud, 1.0, i_radial, Neptune_vtk_radial_File);
+    dump_radial("CH4Ice", ch4_ice, 1.0, i_radial, Neptune_vtk_radial_File);
 
-    dump_radial("H2S", h2s, r_mix, i_radial, Neptune_vtk_radial_File);
-    dump_radial("H2SCloud", h2s_cloud, r_mix, i_radial, Neptune_vtk_radial_File);
-    dump_radial("H2SIce", h2s_ice, r_mix, i_radial, Neptune_vtk_radial_File);
+    dump_radial("H2S", h2s, 1.0, i_radial, Neptune_vtk_radial_File);
+    dump_radial("H2SCloud", h2s_cloud, 1.0, i_radial, Neptune_vtk_radial_File);
+    dump_radial("H2SIce", h2s_ice, 1.0, i_radial, Neptune_vtk_radial_File);
     dump_radial("w_h2s", w_h2s, 1.0, i_radial, Neptune_vtk_radial_File);
     dump_radial("j_h2s", j_h2s, 1.0, i_radial, Neptune_vtk_radial_File);
     dump_radial("jT_h2s", jT_h2s, 1.0, i_radial, Neptune_vtk_radial_File);
     dump_radial("massflux_h2s", massflux_h2s, 1.0, i_radial, Neptune_vtk_radial_File);
     dump_radial("difflux_h2s", difflux_h2s, 1.0, i_radial, Neptune_vtk_radial_File);
 
-    dump_radial("NH3", nh3, r_mix, i_radial, Neptune_vtk_radial_File);
-    dump_radial("NH3Cloud", nh3_cloud, r_mix, i_radial, Neptune_vtk_radial_File);
-    dump_radial("NH3Ice", nh3_ice, r_mix, i_radial, Neptune_vtk_radial_File);
+    dump_radial("NH3", nh3, 1.0, i_radial, Neptune_vtk_radial_File);
+    dump_radial("NH3Cloud", nh3_cloud, 1.0, i_radial, Neptune_vtk_radial_File);
+    dump_radial("NH3Ice", nh3_ice, 1.0, i_radial, Neptune_vtk_radial_File);
     dump_radial("w_nh3", w_nh3, 1.0, i_radial, Neptune_vtk_radial_File);
     dump_radial("j_nh3", j_nh3, 1.0, i_radial, Neptune_vtk_radial_File);
     dump_radial("jT_nh3", jT_nh3, 1.0, i_radial, Neptune_vtk_radial_File);
     dump_radial("massflux_nh3", massflux_nh3, 1.0, i_radial, Neptune_vtk_radial_File);
     dump_radial("difflux_nh3", difflux_nh3, 1.0, i_radial, Neptune_vtk_radial_File);
 
-    dump_radial("NH4SH", nh4sh, r_mix_plus, i_radial, Neptune_vtk_radial_File);
-    dump_radial("w_nh4sh", w_nh4sh, r_mix_plus, i_radial, Neptune_vtk_radial_File);
-    dump_radial("j_nh4sh", j_nh4sh, r_mix_plus, i_radial, Neptune_vtk_radial_File);
-    dump_radial("jT_nh4sh", jT_nh4sh, r_mix_plus, i_radial, Neptune_vtk_radial_File);
-   dump_radial("massflux_nh4sh", massflux_nh4sh, r_mix_plus, i_radial, Neptune_vtk_radial_File);
-    dump_radial("difflux_nh3", difflux_nh4sh, r_mix_plus, i_radial, Neptune_vtk_radial_File);
+    dump_radial("NH4SH", nh4sh, to_mg, i_radial, Neptune_vtk_radial_File);
+    dump_radial("w_nh4sh", w_nh4sh, to_mg, i_radial, Neptune_vtk_radial_File);
+    dump_radial("j_nh4sh", j_nh4sh, to_mg, i_radial, Neptune_vtk_radial_File);
+    dump_radial("jT_nh4sh", jT_nh4sh, to_mg, i_radial, Neptune_vtk_radial_File);
+   dump_radial("massflux_nh4sh", massflux_nh4sh, to_mg, i_radial, Neptune_vtk_radial_File);
+    dump_radial("difflux_nh4sh", difflux_nh4sh, to_mg, i_radial, Neptune_vtk_radial_File);
 
 
     dump_radial("PressureDyn", p_dyn, 1e3, i_radial, Neptune_vtk_radial_File);
@@ -158,7 +166,11 @@ void cNeptuneModel::paraview_vtk_radial(int n, int i_radial){
 */
 void cNeptuneModel::paraview_vtk_zonal(int n, int k_zonal){
     using namespace ParaViewIO;
-    double r_mix_plus = r_mix * 1e6;
+    // kg/m3 -> mg/m3, and NOT r_mix * 1e6 as it was. The species arrays ARE densities, so the old
+    // form multiplied by the mixture density a second time (ATSAT 12397e3, ATNEPT's own 816931f —
+    // which settled the REPORT and left these lists alone). NH4SH keeps a factor of its own while
+    // the rest of the list passes 1.0 because mg/m3 is the unit the shared report prints it in.
+    const double to_mg = 1e6;
     ofstream Neptune_vtk_zonal_File = ParaViewWriter<cNeptuneModel>(*this)
         .open_slice("zonal", "Zonal", k_zonal, n, jm, im, 0.05, false);
     const double z = 0.0;   // out-of-plane component of the in-plane vector below
@@ -178,38 +190,38 @@ void cNeptuneModel::paraview_vtk_zonal(int n, int k_zonal){
 
     dump_zonal("height", aux, 1.0, k_zonal, Neptune_vtk_zonal_File);
 
-    dump_zonal("H2O", h2o, r_mix, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("H2OCloud", h2o_cloud, r_mix, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("H2OIce", h2o_ice, r_mix, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("H2O", h2o, 1.0, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("H2OCloud", h2o_cloud, 1.0, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("H2OIce", h2o_ice, 1.0, k_zonal, Neptune_vtk_zonal_File);
 
-    dump_zonal("CH4", ch4, r_mix, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("CH4Cloud", ch4_cloud, r_mix, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("CH4Ice", ch4_ice, r_mix, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("CH4", ch4, 1.0, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("CH4Cloud", ch4_cloud, 1.0, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("CH4Ice", ch4_ice, 1.0, k_zonal, Neptune_vtk_zonal_File);
 
-    dump_zonal("H2S", h2s, r_mix, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("H2SCloud", h2s_cloud, r_mix, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("H2SIce", h2s_ice, r_mix, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("H2S", h2s, 1.0, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("H2SCloud", h2s_cloud, 1.0, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("H2SIce", h2s_ice, 1.0, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("w_h2s", w_h2s, 1.0, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("j_h2s", j_h2s, 1.0, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("jT_h2s", jT_h2s, 1.0, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("massflux_h2s", massflux_h2s, 1.0, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("difflux_h2s", difflux_h2s, 1.0, k_zonal, Neptune_vtk_zonal_File);
 
-    dump_zonal("NH3", nh3, r_mix, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("NH3Cloud", nh3_cloud, r_mix, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("NH3Ice", nh3_ice, r_mix, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("NH3", nh3, 1.0, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("NH3Cloud", nh3_cloud, 1.0, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("NH3Ice", nh3_ice, 1.0, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("w_nh3", w_nh3, 1.0, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("j_nh3", j_nh3, 1.0, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("jT_nh3", jT_nh3, 1.0, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("massflux_nh3", massflux_nh3, 1.0, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("difflux_nh3", difflux_nh3, 1.0, k_zonal, Neptune_vtk_zonal_File);
 
-    dump_zonal("NH4SH", nh4sh, r_mix_plus, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("w_nh4sh", w_nh4sh, r_mix_plus, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("j_nh4sh", j_nh4sh, r_mix_plus, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("jT_nh4sh", jT_nh4sh, r_mix_plus, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("massflux_nh4sh", massflux_nh4sh, r_mix_plus, k_zonal, Neptune_vtk_zonal_File);
-    dump_zonal("difflux_nh3", difflux_nh4sh, r_mix_plus, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("NH4SH", nh4sh, to_mg, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("w_nh4sh", w_nh4sh, to_mg, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("j_nh4sh", j_nh4sh, to_mg, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("jT_nh4sh", jT_nh4sh, to_mg, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("massflux_nh4sh", massflux_nh4sh, to_mg, k_zonal, Neptune_vtk_zonal_File);
+    dump_zonal("difflux_nh4sh", difflux_nh4sh, to_mg, k_zonal, Neptune_vtk_zonal_File);
 
     dump_zonal("PressureDyn", p_dyn, 1e3, k_zonal, Neptune_vtk_zonal_File);
     dump_zonal("PressureStat", p_stat, 1.0, k_zonal, Neptune_vtk_zonal_File);
@@ -237,7 +249,11 @@ void cNeptuneModel::paraview_vtk_zonal(int n, int k_zonal){
 */
 void cNeptuneModel::paraview_vtk_longal(int n, int j_longal){
     using namespace ParaViewIO;
-    double r_mix_plus = r_mix * 1e6;
+    // kg/m3 -> mg/m3, and NOT r_mix * 1e6 as it was. The species arrays ARE densities, so the old
+    // form multiplied by the mixture density a second time (ATSAT 12397e3, ATNEPT's own 816931f —
+    // which settled the REPORT and left these lists alone). NH4SH keeps a factor of its own while
+    // the rest of the list passes 1.0 because mg/m3 is the unit the shared report prints it in.
+    const double to_mg = 1e6;
     ofstream Neptune_vtk_longal_File = ParaViewWriter<cNeptuneModel>(*this)
         .open_slice("longal", "Longitudinal", j_longal, n, km, im, 0.025, true);
     const double y = 0.0;   // out-of-plane component; longal advances z, so y stayed 0
@@ -258,38 +274,38 @@ void cNeptuneModel::paraview_vtk_longal(int n, int j_longal){
 
     dump_longal("height", aux, 1.0, j_longal, Neptune_vtk_longal_File);
 
-    dump_longal("H2O", h2o, r_mix, j_longal, Neptune_vtk_longal_File);
-    dump_longal("H2OCloud", h2o_cloud, r_mix, j_longal, Neptune_vtk_longal_File);
-    dump_longal("H2OIce", h2o_ice, r_mix, j_longal, Neptune_vtk_longal_File);
+    dump_longal("H2O", h2o, 1.0, j_longal, Neptune_vtk_longal_File);
+    dump_longal("H2OCloud", h2o_cloud, 1.0, j_longal, Neptune_vtk_longal_File);
+    dump_longal("H2OIce", h2o_ice, 1.0, j_longal, Neptune_vtk_longal_File);
 
-    dump_longal("CH4", ch4, r_mix, j_longal, Neptune_vtk_longal_File);
-    dump_longal("CH4Cloud", ch4_cloud, r_mix, j_longal, Neptune_vtk_longal_File);
-    dump_longal("CH4Ice", ch4_ice, r_mix, j_longal, Neptune_vtk_longal_File);
+    dump_longal("CH4", ch4, 1.0, j_longal, Neptune_vtk_longal_File);
+    dump_longal("CH4Cloud", ch4_cloud, 1.0, j_longal, Neptune_vtk_longal_File);
+    dump_longal("CH4Ice", ch4_ice, 1.0, j_longal, Neptune_vtk_longal_File);
 
-    dump_longal("H2S", h2s, r_mix, j_longal, Neptune_vtk_longal_File);
-    dump_longal("H2SCloud", h2s_cloud, r_mix, j_longal, Neptune_vtk_longal_File);
-    dump_longal("H2SIce", h2s_ice, r_mix, j_longal, Neptune_vtk_longal_File);
+    dump_longal("H2S", h2s, 1.0, j_longal, Neptune_vtk_longal_File);
+    dump_longal("H2SCloud", h2s_cloud, 1.0, j_longal, Neptune_vtk_longal_File);
+    dump_longal("H2SIce", h2s_ice, 1.0, j_longal, Neptune_vtk_longal_File);
     dump_longal("w_h2s", w_h2s, 1.0, j_longal, Neptune_vtk_longal_File);
     dump_longal("j_h2s", j_h2s, 1.0, j_longal, Neptune_vtk_longal_File);
     dump_longal("jT_h2s", jT_h2s, 1.0, j_longal, Neptune_vtk_longal_File);
     dump_longal("massflux_h2s", massflux_h2s, 1.0, j_longal, Neptune_vtk_longal_File);
     dump_longal("difflux_h2s", difflux_h2s, 1.0, j_longal, Neptune_vtk_longal_File);
 
-    dump_longal("NH3", nh3, r_mix, j_longal, Neptune_vtk_longal_File);
-    dump_longal("NH3Cloud", nh3_cloud, r_mix, j_longal, Neptune_vtk_longal_File);
-    dump_longal("NH3Ice", nh3_ice, r_mix, j_longal, Neptune_vtk_longal_File);
+    dump_longal("NH3", nh3, 1.0, j_longal, Neptune_vtk_longal_File);
+    dump_longal("NH3Cloud", nh3_cloud, 1.0, j_longal, Neptune_vtk_longal_File);
+    dump_longal("NH3Ice", nh3_ice, 1.0, j_longal, Neptune_vtk_longal_File);
     dump_longal("w_nh3", w_nh3, 1.0, j_longal, Neptune_vtk_longal_File);
     dump_longal("j_nh3", j_nh3, 1.0, j_longal, Neptune_vtk_longal_File);
     dump_longal("jT_nh3", jT_nh3, 1.0, j_longal, Neptune_vtk_longal_File);
     dump_longal("massflux_nh3", massflux_nh3, 1.0, j_longal, Neptune_vtk_longal_File);
     dump_longal("difflux_nh3", difflux_nh3, 1.0, j_longal, Neptune_vtk_longal_File);
 
-    dump_longal("NH4SH", nh4sh, r_mix_plus, j_longal, Neptune_vtk_longal_File);
-    dump_longal("w_nh4sh", w_nh4sh, r_mix_plus, j_longal, Neptune_vtk_longal_File);
-    dump_longal("j_nh4sh", j_nh4sh, r_mix_plus, j_longal, Neptune_vtk_longal_File);
-    dump_longal("jT_nh4sh", jT_nh4sh, r_mix_plus, j_longal, Neptune_vtk_longal_File);
-    dump_longal("massflux_nh4sh", massflux_nh4sh, r_mix_plus, j_longal, Neptune_vtk_longal_File);
-    dump_longal("difflux_nh3", difflux_nh4sh, r_mix_plus, j_longal, Neptune_vtk_longal_File);
+    dump_longal("NH4SH", nh4sh, to_mg, j_longal, Neptune_vtk_longal_File);
+    dump_longal("w_nh4sh", w_nh4sh, to_mg, j_longal, Neptune_vtk_longal_File);
+    dump_longal("j_nh4sh", j_nh4sh, to_mg, j_longal, Neptune_vtk_longal_File);
+    dump_longal("jT_nh4sh", jT_nh4sh, to_mg, j_longal, Neptune_vtk_longal_File);
+    dump_longal("massflux_nh4sh", massflux_nh4sh, to_mg, j_longal, Neptune_vtk_longal_File);
+    dump_longal("difflux_nh4sh", difflux_nh4sh, to_mg, j_longal, Neptune_vtk_longal_File);
 
 
     dump_longal("PressureDyn", p_dyn, 1e3, j_longal, Neptune_vtk_longal_File);
@@ -320,7 +336,11 @@ void cNeptuneModel::paraview_vtk_longal(int n, int j_longal){
 void cNeptuneModel::paraview_sphere_vts(int n){
     using namespace ParaViewIO;
     double x, y, z, sinthe, sinphi, costhe, cosphi;
-    double r_mix_plus = r_mix * 1e6;
+    // kg/m3 -> mg/m3, and NOT r_mix * 1e6 as it was. The species arrays ARE densities, so the old
+    // form multiplied by the mixture density a second time (ATSAT 12397e3, ATNEPT's own 816931f —
+    // which settled the REPORT and left these lists alone). NH4SH keeps a factor of its own while
+    // the rest of the list passes 1.0 because mg/m3 is the unit the shared report prints it in.
+    const double to_mg = 1e6;
     string Neptune_sphere_vts_File_Name = output_path + "/Neptune_sphere_" 
         + std::to_string(n) + ".vts";
     ofstream Neptune_sphere_vts_File;
@@ -433,7 +453,7 @@ void cNeptuneModel::paraview_sphere_vts(int n){
     for(int k = 0; k < km; k++){
         for(int j = 0; j < jm; j++){
             for(int i = 0; i < im; i++){
-                Neptune_sphere_vts_File << r_mix_plus * nh4sh.x[i][j][k] << endl;
+                Neptune_sphere_vts_File << to_mg * nh4sh.x[i][j][k] << endl;
             }
             Neptune_sphere_vts_File <<  "\n"  << endl;
         }
