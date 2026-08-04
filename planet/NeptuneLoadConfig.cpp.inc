@@ -22,6 +22,7 @@
     Config::FillDoubleWithElement(elem_neptune, "buoyancy", buoyancy);
     Config::FillDoubleWithElement(elem_neptune, "chemical_reaction", chemical_reaction);
     Config::FillDoubleWithElement(elem_neptune, "epsres", epsres);
+    Config::FillStringWithElement(elem_neptune, "turb_model", turb_model);
     Config::FillDoubleWithElement(elem_neptune, "L_atm", L_atm);
     Config::FillDoubleWithElement(elem_neptune, "tropopause_pole", tropopause_pole);
     Config::FillDoubleWithElement(elem_neptune, "tropopause_equator", tropopause_equator);

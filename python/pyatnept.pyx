@@ -179,6 +179,15 @@ cdef class Neptune:
             self._check_alive()
             self._thisptr.epsres = <double> value
     
+    property turb_model:
+        def __get__(Neptune self):
+            self._check_alive()
+            return self._thisptr.turb_model
+    
+        def __set__(Neptune self, value):
+            self._check_alive()
+            self._thisptr.turb_model = <string> value
+    
     property L_atm:
         def __get__(Neptune self):
             self._check_alive()

@@ -38,6 +38,14 @@ def main():
             ('chemical_reaction', 'chemical reactions included', 'double', 1),
             ('epsres', 'accuracy of relative and absolute errors', 'double', 0.00001),
 
+# Turbulence closure selection, as in ATJUP, ATSAT, ATURAN and ATOM. TurbulenceNept reads this; the
+# module as a whole is still gated by ATNEPT_TURB, and ATNEPT_TURB_MODEL overrides this value at
+# runtime. Uncomment one of the alternatives below to change the default.
+            ('turb_model', 'turbulence model: none, k_epsilon, k_omega, k_omega_SST', 'string', 'k_omega_SST'),
+#            ('turb_model', 'turbulence model: none, k_epsilon, k_omega, k_omega_SST', 'string', 'k_omega'),
+#            ('turb_model', 'turbulence model: none, k_epsilon, k_omega, k_omega_SST', 'string', 'k_epsilon'),
+#            ('turb_model', 'turbulence model: none, k_epsilon, k_omega, k_omega_SST', 'string', 'none'),
+
             ('L_atm', 'extension of the atmosphere shell in km, 550km/40 steps = 137.5km', 'double', 550.0),
 
             ('tropopause_pole', 'extension of the troposphere at the poles in km', 'double', 250.0),

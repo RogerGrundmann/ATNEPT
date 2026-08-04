@@ -177,7 +177,9 @@ void cNeptuneModel::Run(){
     // THE turbulence gate, resolved once. ATNEPT_TURB and turb_model must BOTH allow it: on ATSAT
     // these were two independent switches and only one of them decided anything, so a run with
     // turb_model = "none" still ran the closure. Both are consulted here and the answer is a bool
-    // the rest of the run reads.
+    // the rest of the run reads. ATNEPT_TURB_MODEL overrides the configured string first, so the
+    // gate is fixed only after the configuration and the override are both final.
+    if(const char* tm = getenv("ATNEPT_TURB_MODEL")) turb_model = tm;
     turb_active = (turb_env_enabled() != 0) && (turb_model != "none");
 
 

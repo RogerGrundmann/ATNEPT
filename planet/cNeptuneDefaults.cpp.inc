@@ -18,6 +18,7 @@ void cNeptuneModel::SetDefaultConfig() {
   buoyancy = 1;
   chemical_reaction = 1;
   epsres = 1e-05;
+  turb_model = "k_omega_SST";
   L_atm = 550.0;
   tropopause_pole = 250.0;
   tropopause_equator = 200.0;

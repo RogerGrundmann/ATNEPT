@@ -237,10 +237,10 @@ public:
     double re_turb = 1.0;       // = vel_star_ref*z_0/nue, set by the closure
     double abl_height = 20000.0; // boundary-layer height [m]
 
-    // Unlike ATSAT, turb_model is NOT a configuration entry here — adding one means regenerating
-    // ATNEPT's params and config, which is more than this stage needs while the gate is off.
-    std::string turb_model = "k_omega_SST";
-    bool turb_active = false;   // THE gate; set by the knob at the call site
+    // turb_model is a configuration parameter, as in ATJUP, ATSAT and ATURAN — declared by
+    // NeptuneParams.h.inc from param.py, so it is NOT declared here. ATNEPT_TURB_MODEL still
+    // overrides it at runtime.
+    bool turb_active = false;   // THE gate; set in Run() from ATNEPT_TURB and turb_model together
 
     std::vector<std::vector<double> > t_top_init;
 
