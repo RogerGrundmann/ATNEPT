@@ -138,7 +138,13 @@ void cNeptuneModel::init_PressureStatic(){
                 double height = get_layer_height(i);                    // km
                 t.x[i][j][k] = (T_bottom - gam * height) / t_ref;
 
-                p_stat.x[i][j][k] = p_bottom * pow(t.x[i][j][k], exp_pressure);
+                // The base is the RATIO T(i)/T(0), not T(i)/t_ref. p_bottom is the pressure at
+                // T_bottom, so the exponent must be anchored there too or the whole field is
+                // scaled by (T_bottom/t_ref)^n — 607x on Neptune, which put the top of the
+                // domain at 15 bar. T_bottom is used rather than t.x[0][j][k] so the expression
+                // does not depend on i = 0 having been written earlier in this same loop.
+                p_stat.x[i][j][k] = p_bottom
+                    * pow(t.x[i][j][k] * t_ref / T_bottom, exp_pressure);
             }
         }
     }
