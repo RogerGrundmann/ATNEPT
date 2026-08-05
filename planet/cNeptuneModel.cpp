@@ -618,6 +618,7 @@ void cNeptuneModel::resetArrays(){
     epsilon.initArray(im, jm, km, 0.0);              // layer emissivity
     Q_rad.initArray(im, jm, km, 0.0);                // radiative heating rate [W/m3]
     p_dyn.initArray(im, jm, km, pa);                // dynamic pressure
+    p_hydro.initArray(im, jm, km, 0.0);             // hydrostatic pressure perturbation
     p_dynn.initArray(im, jm, km, pa);               // dynamic pressure, previous iteration
     p_stat.initArray(im, jm, km, pa);                // static pressure
     rho_mix.initArray(im, jm, km, 0.0);          // local mixture density

@@ -1029,7 +1029,23 @@ private:
     // until steadyQuery was revived: the routine's pressure case was commented out, its
     // accumulators with it. Maintained by restoreVar with the other n-copies.
     Array p_dynn;               // dynamic pressure, previous iteration
-    Array p_stat;                // static pressure
+    Array p_stat;
+    // ---- Hydrostatic buoyancy split, ported from ATJUP (computeHydrostaticPressure) ----
+    // buoy_ref_level[i] is the area-weighted horizontal mean, at each level, of the very
+    // expression the buoyancy takes the anomaly of — ATSAT's device. p_hydro is the vertical
+    // integral of that anomaly, so d(p_hydro)/dr IS the buoyancy and the radial force balances by
+    // construction. Both are refreshed once per Runge-Kutta step.
+    //
+    // WHY BOTH ARE NEEDED HERE. Measured on this model, the buoyancy term in rhs_u is ~1e5 too
+    // small (p_stat is in bar, the ideal-gas density needs pascals). Restoring the factor was
+    // measured over 224 iterations and changed the answer by 0.5 %: the pressure projection simply
+    // absorbs a larger radial body force and returns a matching dpdr. Removing the radial buoyancy
+    // ANALYTICALLY is what leaves a residual able to drive a circulation.
+    std::vector<double> buoy_ref_level;
+    Array p_hydro;               // hydrostatic pressure perturbation
+
+    void computeBuoyancyRefLevel();
+    void computeHydrostaticPressure();                // static pressure
 
     Array rhs_t;                // auxilliar field RHS temperature
     Array rhs_u;                // auxilliar field RHS u-velocity component
