@@ -167,7 +167,7 @@ void cNeptuneModel::Forces(){
     double rm, sinthe, costhe, rmsinthe;
 
     for(int i = 1; i < im-1; i++){
-        rm = rad.z[i];
+        rm = metricRadius(rad.z[i]);
         for(int j = 1; j < jm-1; j++){
             sinthe = sin(the.z[j]);
             costhe = cos(the.z[j]);

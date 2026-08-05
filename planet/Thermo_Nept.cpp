@@ -60,7 +60,7 @@ void cNeptuneModel::Latent_Heat(){
         double sinthe = sin(the.z[j]);
         for(int k = 1; k < km-1; k++){
             for(int i = im-2; i >= 1; i--){
-                double rm = rad.z[i];
+                double rm = metricRadius(rad.z[i]);
                 double rmsinthe = rm * sinthe;
 
                 double t_u = t.x[i][j][k] * t_ref;
