@@ -156,7 +156,10 @@ public:
         for(int k = 1; k < km-1; k++){
             for(int j = 1; j < jm-1; j++){
                 for(int i = 1; i < im-1; i++){
-                    const double rm       = m.rad.z[i];
+                    // Through the accessor, as the integrator and the pressure solve do — the
+                    // species equations carry the same horizontal derivatives and must see the
+                    // same geometry. Identity while ATNEPT_METRIC_RADIUS is unset.
+                    const double rm       = m.metricRadius(m.rad.z[i]);
                     const double sinthe   = std::max(sinthe_min, std::abs(sin(m.the.z[j])));
                     const double rmsinthe = rm * sinthe;
 
@@ -198,7 +201,10 @@ public:
         for(int k = 1; k < km-1; k++){
             for(int j = 1; j < jm-1; j++){
                 for(int i = 1; i < im-1; i++){
-                    const double rm       = m.rad.z[i];
+                    // Through the accessor, as the integrator and the pressure solve do — the
+                    // species equations carry the same horizontal derivatives and must see the
+                    // same geometry. Identity while ATNEPT_METRIC_RADIUS is unset.
+                    const double rm       = m.metricRadius(m.rad.z[i]);
                     const double sinthe   = std::max(sinthe_min, std::abs(sin(m.the.z[j])));
                     const double rmsinthe = rm * sinthe;
 

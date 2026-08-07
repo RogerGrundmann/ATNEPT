@@ -72,7 +72,11 @@ public:
         #pragma omp parallel for collapse(2) schedule(dynamic, 4)
         for (int i = 1; i < m.im-1; i++) {
             for (int j = 1; j < m.jm-1; j++) {
-                const double rm             = m.rad.z[i];
+                // Must match the integrator's metric, or the projection solves a different
+                // geometry than the momentum equation it is projecting. RungeKutta_Nept_Turb.cpp
+                // asks metricRadius(); this is the DEFAULT solver, so it has to ask it too.
+                // Identity while ATNEPT_METRIC_RADIUS is unset, hence bit-identical by default.
+                const double rm             = m.metricRadius(m.rad.z[i]);
                 const double rm2            = rm * rm;
                 const double sinthe         = sinthe_table[j];
                 const double inv_rm         = 1.0 / rm;
