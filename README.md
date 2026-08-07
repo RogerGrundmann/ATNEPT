@@ -235,24 +235,46 @@ radial, zonal, and longitudinal cross-sections).
 
 None of these stops a run; all of them affect what a result means.
 
-1. **There is an unopposed heating excess, and it is the highest-value open item.** Run to 224
-   iterations with the radiation diagnostic on, the τ=1 photosphere settles at **205.74 K against a
-   T_eff(in) of 59.28 K** — 146 K too warm — emitting **143× the planet's energy budget** and still
-   climbing at +0.34 K/iteration. This is the worst row of the four models. Until it is found, **the
-   opacity constants cannot be judged against this model at all**.
+1. **The photosphere is 146 K too warm, and it is mostly redistribution rather than heating.** Run
+   to 224 iterations with the radiation diagnostic on, the τ=1 photosphere settles at **205.74 K
+   against a T_eff(in) of 59.28 K**, emitting **143× the planet's energy budget** and still climbing.
+   This is the worst row of the four models. Until it is found, **the opacity constants cannot be
+   judged against this model at all**.
+
+   The column mean says what kind of fault it is:
+
+   | checkpoint | T(i=0) deep | T(i=20) mid | T(i=40) top | column mean |
+   |---|---|---|---|---|
+   | 1 | 727.75 | 407.19 | 90.09 | 409.34 |
+   | 28 | 618.71 | 429.72 | 206.32 | 421.72 |
+
+   The deep loses **109.04 K**, the top gains **116.23 K**, and the mean rises **12.38 K (+3.02 %)**.
+   So there *is* a genuine net heat gain — unlike ATURAN, whose mean **falls** 0.9 % over the same
+   run and whose fault is purely redistributive — but it is not what dominates: the vertical
+   redistribution is roughly **9× larger** than the net gain. Thermal diffusion flattens the initial
+   adiabat, nothing anchors the top of the column to the planet's energy budget, and the photosphere
+   drifts toward the column mean; a smaller real heat source sits underneath that.
+
+   **Two ice giants with near-identical `rhs_t` giving opposite signs on the column mean is itself
+   an open question**, and it is not explained. `ATNEPT_THERMAL_MASSFLUX`'s six-order dominance of
+   `rhs_t` (item 3) is the obvious suspect and no more than a suspect. Anyone attacking item 1
+   should separate the two components before assuming a single cause: the anchor that is missing
+   (see ATURAN's `ATURAN_RAD_COUPLING`, which this model does not yet have — item 5) and the
+   +3 % source, which ATURAN does not have at all.
 
 2. **That number got worse when a real bug was fixed, and the previous one was not better.** Before
    the methane-viscosity correction this model read 2.860× — an artefact of two errors partly
    cancelling. `mue_ch4` held methane's viscosity in *centipoise* as if it were Pa·s, so the
    mass-weighted `mue_mix` came out ~150× too large, and `mue_mix` sets the species diffusivities and
-   hence the diffusive-enthalpy sink in `rhs_t`. That sink, ~150× overweighted, was holding the
-   column down against the heating excess above.
+   hence the diffusive-enthalpy sink in `rhs_t`. That sink, ~150× overweighted, was resisting the
+   flattening in item 1. Correcting it unmasked the drift rather than causing it.
 
 3. **`ATNEPT_THERMAL_MASSFLUX` is a measurement instrument, not a fix.** Setting it to 0 removes the
-   sink entirely and the model runs away harder (176× at 224 iterations), so the term is
-   load-bearing even though its form is questionable: it is a flux times a temperature *gradient
-   magnitude*, with an absolute value on one component only, so it cannot change sign to oppose a
-   runaway.
+   sink entirely and the model drifts harder (176× at 224 iterations), so the term is load-bearing
+   even though its form is questionable: it is a flux times a temperature *gradient magnitude*, with
+   an absolute value on one component only, so it cannot change sign to oppose the flattening. It
+   dominates `rhs_t` by six orders of magnitude on this model, which is why item 1 names it as the
+   suspect for the +3 % net gain that ATURAN does not have.
 
 4. **The static pressure profile was wrong until recently, and old output reflects it.** Any run
    predating the `init_PressureStatic` fix has its entire pressure field inflated by 607×, with the
