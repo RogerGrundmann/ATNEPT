@@ -129,25 +129,29 @@ void cNeptuneModel::Latent_Heat(){
 
 
 
-                if(h2s.x[i][j][k] >= q_Rain_h2s)  
-                    Q_Latent.x[i][j][k] = Q_Latent.x[i][j][k] + lv_h2s 
+                // THE H2S AND NH3 CONTRIBUTIONS ACCUMULATE ONTO THE H2O ONE, AND HAVE NO else. All
+                // four branches below used to carry "else Q_Latent = 0.0" / "else Latency_Ice =
+                // 0.0". With two clobbering species in series an H2O contribution survived only
+                // where H2S *and* NH3 were both saturated as well — this model was the worst
+                // affected of the family for exactly that reason. A species that does not condense
+                // contributes nothing; it does not erase the species that does. ATJUP hit this and
+                // records that deep NH3 cannot condense at all, leaving Q_Latent zero over most of
+                // the domain. ATURAN accumulates; ATSAT is corrected alongside.
+                if(h2s.x[i][j][k] >= q_Rain_h2s)
+                    Q_Latent.x[i][j][k] = Q_Latent.x[i][j][k] + lv_h2s
                         * velocity_av * dh2s/(L_atm * L_atm) * qheat_fix();
-                else  Q_Latent.x[i][j][k] = 0.0;
 
                 if(h2s.x[i][j][k] >= q_Ice_h2s)  
                     Latency_Ice = Latency_Ice + ls_h2s * velocity_av * dh2s/(L_atm * L_atm) * qheat_fix();
-                else  Latency_Ice = 0.0;
 
 
 
                 if(nh3.x[i][j][k] >= q_Rain_nh3)  
                     Q_Latent.x[i][j][k] = Q_Latent.x[i][j][k] + lv_nh3 
                         * velocity_av * dnh3/(L_atm * L_atm) * qheat_fix();
-                else  Q_Latent.x[i][j][k] = 0.0;
 
                 if(nh3.x[i][j][k] >= q_Ice_nh3)  
                     Latency_Ice = Latency_Ice + ls_nh3 * velocity_av * dnh3/(L_atm * L_atm) * qheat_fix();
-                else  Latency_Ice = 0.0;
 
 
 
