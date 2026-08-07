@@ -322,13 +322,39 @@ public:
     //
     // metricRadius() is the established hook for the one place ATSAT and ATJUP genuinely differ
     // in the limiter: ATJUP shifts rad.z itself at initialisation and so returns rm unchanged,
-    // while ATSAT shifts the metric factors here instead. ATNEPT is in ATJUP's position for a
-    // simpler reason — it has no metric radius at all — so this is the identity unless
-    // ATNEPT_METRIC_RADIUS is set, and the shared limiter reproduces the m.rad.z[i] the
-    // hand-written copy used, exactly.
+    // while ATSAT shifts the metric factors here instead. ATNEPT takes ATSAT's route and shifts
+    // the metric factors here.
+    //
+    // ON BY DEFAULT SINCE 2026-08-07. rad.z runs 1..2, so an unshifted metric put Neptune's
+    // surface L_atm = 550 km from the centre instead of R = 24622 km, and every HORIZONTAL
+    // derivative was R/L_atm = 45x too large. Set ATNEPT_METRIC_RADIUS=0 to restore the unshifted
+    // metric — the run is then bit-identical to the pre-flip default.
+    //
+    // MEASURED BEFORE FLIPPING, at nm=224, single-threaded, radiation on:
+    //
+    //      quantity                        rad.z metric      corrected metric
+    //      continuity residuum                  1.217334              0.050666
+    //      max |v| meridional [m/s]              22.9098                1.3930
+    //      max |u| radial [m/s]                  80.1531                2.6732
+    //      max |w| zonal [m/s]                   68.2959               68.5485
+    //      T(tau=1) [K]                           205.74                203.36
+    //      OLR / input budget                      143.4                 135.6
+    //
+    // The continuity residuum falls 24x and nothing goes non-finite. The zonal wind is prescribed
+    // and is untouched, which is the control saying this is the metric and not a blanket damping.
+    // The meridional wind falls 16.4x rather than the nominal 45x — the response is nonlinear
+    // because the dynamics rebalance, and proportionality was never the right test (ATURAN's fell
+    // ~50x against a nominal 70x). It does NOT fix the photosphere: see README item 1.
+    //
+    // THE PREREQUISITE WAS THE COMPANION COMMIT. Flipping this while PressureSolverNept.h still
+    // read rad.z directly would have left the projection solving a 550 km geometry against the
+    // momentum equation's 24622 km one — a half-converted metric, which ATURAN's 1c4da64 records
+    // as worse than an unconverted one. That solver and ChemistryNept.h are wired first.
+    static constexpr double R_neptune_km = 24622.0;   // volumetric mean radius
     double metricRadius(double rm){
         static const double R_km = [](){
-            const char* e = getenv("ATNEPT_METRIC_RADIUS"); return e ? atof(e) : 0.0; }();
+            const char* e = getenv("ATNEPT_METRIC_RADIUS");
+            return e ? atof(e) : R_neptune_km; }();
         if(!(R_km > 0.0)) return rm;
         return rm + (R_km / L_atm - 1.0);
     }

@@ -168,7 +168,8 @@ temperature equation on this model — there is no `ATNEPT_RAD_COUPLING`, unlike
 | `ATNEPT_SINTHE_MIN` | 0.0 | env floor on sin θ — **not the value in force**: the integrator uses a hardcoded `sinthe_min = 0.4`, so this accessor is not consulted by default |
 | `ATNEPT_PRESS_SOLVER` | *see code* | pressure-solver selection |
 | `ATNEPT_STEADY` | 1 | steady-state query in the report |
-| `ATNEPT_LOCAL_RHO`, `ATNEPT_METRIC_RADIUS`, `ATNEPT_COSTHE_ABS`, `ATNEPT_PDYN_UNITS` | — | legacy/behaviour switches |
+| `ATNEPT_METRIC_RADIUS` | **24622** | Neptune's mean radius in km, referring the 1/r metric factors to the planet rather than to `rad.z`'s 1..2. **ON by default** — set to `0` for the unshifted metric, which is bit-identical to the pre-flip default |
+| `ATNEPT_LOCAL_RHO`, `ATNEPT_COSTHE_ABS`, `ATNEPT_PDYN_UNITS` | — | legacy/behaviour switches |
 
 ---
 
@@ -285,7 +286,33 @@ None of these stops a run; all of them affect what a result means.
    arrays and nothing reads them back: there is no `ATNEPT_RAD_COUPLING`, `S_precip_*` reaches no
    RHS, and `ATNEPT_TURB_COUPLING` defaults to 0.
 
-6. **The grey opacity is Jupiter's calibration, not Neptune's.** `C_cia` and `opac_cal` were tuned so
+6. **The metric radius was corrected and made the default, and results before that commit are not
+   comparable with results after it.** `rad.z` runs 1..2, so an unshifted metric put Neptune's
+   surface `L_atm` = 550 km from the centre instead of R = 24622 km, making every horizontal
+   derivative 45× too large. `metricRadius()` now defaults to the planet's radius;
+   `ATNEPT_METRIC_RADIUS=0` restores the old metric bit-identically (verified, 92/92 output files).
+
+   | quantity | `rad.z` metric | corrected |
+   |---|---|---|
+   | continuity residuum | 1.217334 | **0.050666** |
+   | max \|v\| meridional [m/s] | 22.9098 | **1.3930** |
+   | max \|u\| radial [m/s] | 80.1531 | **2.6732** |
+   | max \|w\| zonal [m/s] | 68.2959 | 68.5485 |
+   | T(τ=1) [K] | 205.74 | 203.36 |
+   | OLR / input | 143.4 | 135.6 |
+
+   The continuity residuum falls 24× and nothing goes non-finite. The zonal wind is prescribed and
+   is untouched, which is the control saying this is the metric and not a blanket damping. The
+   meridional wind falls 16.4× rather than the nominal 45× — the response is nonlinear because the
+   dynamics rebalance, and proportionality was never the right test. **This is not a fix for item
+   1**: OLR/in moves 5 %, because that fault is vertical and this correction is horizontal.
+
+   Two sites still read `rad.z` raw: `Turbulence.h:490` and `:705`. That file is **shared**, so
+   changing it costs the four-repo protocol, and `ATNEPT_TURB` defaults off — so they are inert in
+   a stock run. Switching the closure on together with the corrected metric means closing that gap
+   first.
+
+7. **The grey opacity is Jupiter's calibration, not Neptune's.** `C_cia` and `opac_cal` were tuned so
    that Jupiter's photosphere lands at 0.25–0.35 bar. Nothing has recalibrated them here.
 
 ---
