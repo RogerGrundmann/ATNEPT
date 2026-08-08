@@ -185,10 +185,14 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
     //
     // NOT FIXED HERE, a separate defect in the same term: Coriolis_phi enters rhs_w WITHOUT the
     // scale_Cor = L_atm/u_0 that rhs_u and rhs_v apply to the other two components, leaving the
-    // zonal component 3600x weaker than its siblings. That belongs to the unit-system port
-    // (ATJUP af0446d), and ATURAN carries the identical defect, also unfixed.
+    // zonal component unscaled relative to its siblings. 024c37f called that "3600x"; THAT NUMBER
+    // WAS WRONG — L_atm is stored in KILOMETRES, so scale_Cor = 360/100 = 3.6, not 3600. Fixed
+    // below; ATURAN corrected the same defect and the same number in 228600e.
     static const bool cor_legacy = [](){
         const char* e = getenv("ATNEPT_CORIOLIS_LEGACY"); return e && atoi(e) != 0; }();
+    // Separate knob from the sign fix: different defects in the same term.
+    static const bool cor_phi_legacy = [](){
+        const char* e = getenv("ATNEPT_CORIOLIS_PHI_LEGACY"); return e && atoi(e) != 0; }();
     double Coriolis_rad  = -2.0 * omega * sinthe * w_ijk;
     double Coriolis_the  = (cor_legacy ? +2.0 : -2.0) * omega * costhe * w_ijk;
     double Coriolis_phi  = +2.0 * omega * ((cor_legacy ? -1.0 : +1.0) * costhe * v_ijk
@@ -482,7 +486,9 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
         - dphdphi_term
         - transport_w
         + diffusion_w / re_eff + diffusion_w * nue_t
-        - Coriolis    * Coriolis_phi;
+        // scale_Cor here too. rhs_u and rhs_v have always applied it to the other two components;
+        // this one did not. ATNEPT_CORIOLIS_PHI_LEGACY=1 restores the unscaled form.
+        - Coriolis    * (cor_phi_legacy ? 1.0 : scale_Cor) * Coriolis_phi;
 
     rhs_ch4.x[i][j][k] =
         - transport_ch4
