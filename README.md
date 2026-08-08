@@ -215,6 +215,38 @@ OMP_NUM_THREADS=12 ./cli/nept . config_atnept.xml > run.log 2>&1
 Runs in this repository's measurements are single-threaded (`OMP_NUM_THREADS=1`) so that results
 are bit-reproducible and byte-comparisons between builds mean something.
 
+**This model used to be non-reproducible above one thread, and that is fixed.** The site was
+`PressureSolverNept.h`'s Poisson loop — Gauss-Seidel written in place, with
+`#pragma omp parallel for collapse(2) schedule(dynamic, 4)` over the very two indices its stencil
+reads across, so cell `(i,j,k)` was read by the thread owning `(i+1,j)` or `(i,j+1)` while its
+owner was writing it. `schedule(dynamic)` meant the chunk assignment itself varied with timing, so
+the same binary at the same thread count differed run to run. It is now serial; see the comment in
+that file. Measured at nm=4:
+
+| configuration | 16t run A vs B | 1t vs 16t |
+|---|---|---|
+| before, `ATNEPT_PRESS_SOLVER=0` (default) | differ, 1 of 7 files | differ, 6 of 7 files |
+| after, `ATNEPT_PRESS_SOLVER=0` (default) | **bit-identical** | **bit-identical** |
+| `ATNEPT_PRESS_SOLVER=1` (shared red-black) | **bit-identical** | **bit-identical** |
+
+**Nothing was taken back to get this.** One thread ran `collapse(2)` in lexicographic order
+already, so the serial loop reproduces the previous 1-thread answer bit-identically, with not one
+differing log line — every single-threaded measurement in this file still stands. `computePressure`
+was 0.003 s at 16 threads and is 0.03 s serial.
+
+This defect was found in ATURAN and the same check was then run here. ATSAT and ATJUP never had it:
+both deleted their per-planet solvers and bind straight to the shared red-black
+`PressureSolver<Planet>`, which is byte-identical in all four repositories.
+
+**What remains is a diagnostic, and it is NOT a race.** Above one thread the log's
+saturation-adjustment block — `i_sat`/`j_sat`/`k_sat`, `iter_prec_found`, and the `p_stat`, `T`,
+`saturation` and per-species `humid/cloud/ice` values printed with them — still varies run to run.
+That block is filled under `#pragma omp critical` and records *the last cell that satisfied the
+condition*, so the winner depends on thread arrival order by construction. It is properly
+synchronised, it writes reporting variables only, and every output file is bit-identical across it:
+those are the only log lines that differ, checked line-kind by line-kind. Read `i_sat` as "an
+example cell", not "the cell", whenever threads > 1.
+
 ### Python
 
 ```python
