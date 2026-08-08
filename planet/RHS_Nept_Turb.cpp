@@ -159,12 +159,80 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
 
 
     // ===== Coriolis and centrifugal =====
+    // ===== TWO OF THE THREE CORIOLIS COMPONENTS DEFLECTED TO THE LEFT =====
+    //
+    // Ported from ATJUP ec698e1 via ATURAN 8b284cb. ATNEPT and ATURAN were character-for-character
+    // identical here and both missed ATJUP's late-July body-force campaign; ATSAT and ATJUP have it.
+    //
+    // With theta the COLATITUDE and v the theta-component (so +v is southward), -2*Omega x u is
+    //
+    //     a_r = +2*Omega*sin*w    a_theta = +2*Omega*cos*w    a_phi = -2*Omega*(cos*v + sin*u)
+    //
+    // and all three enter rhs_* through a minus, so each variable must hold -a. Coriolis_rad did.
+    // Coriolis_the held +2*Omega*cos*w and delivered -a_theta, so an eastward wind in the northern
+    // hemisphere was turned NORTHWARD; eastward flow at northern mid-latitudes must go RIGHT, which
+    // is south, which is +e_theta. Coriolis_phi held +2*Omega*(-cos*v + sin*u): the sin*u half was
+    // right and the cos*v half was not, so southward flow in the north was turned EAST instead of
+    // west. That mixture is why it lasted — Coriolis_phi was not plus or minus any consistent
+    // expression, so neither sign looked obviously wrong.
+    //
+    // ON ATURAN THIS DID NOT RESTORE THE CIRCULATION, and it is not expected to here: the
+    // meridional Coriolis force is dominated by the PRESCRIBED zonal wind, so it is close to a
+    // function of latitude and height alone, and a theta-directed force depending only on theta is
+    // a gradient, which the pressure projection absorbs. It is committed as a correctness fix.
+    //
+    // ATNEPT_CORIOLIS_LEGACY=1 restores the two pre-port signs.
+    //
+    // NOT FIXED HERE, a separate defect in the same term: Coriolis_phi enters rhs_w WITHOUT the
+    // scale_Cor = L_atm/u_0 that rhs_u and rhs_v apply to the other two components, leaving the
+    // zonal component 3600x weaker than its siblings. That belongs to the unit-system port
+    // (ATJUP af0446d), and ATURAN carries the identical defect, also unfixed.
+    static const bool cor_legacy = [](){
+        const char* e = getenv("ATNEPT_CORIOLIS_LEGACY"); return e && atoi(e) != 0; }();
     double Coriolis_rad  = -2.0 * omega * sinthe * w_ijk;
-    double Coriolis_the  = +2.0 * omega * costhe * w_ijk;
-    double Coriolis_phi  = +2.0 * omega * (-costhe * v_ijk + sinthe * u_ijk);
+    double Coriolis_the  = (cor_legacy ? +2.0 : -2.0) * omega * costhe * w_ijk;
+    double Coriolis_phi  = +2.0 * omega * ((cor_legacy ? -1.0 : +1.0) * costhe * v_ijk
+                                           + sinthe * u_ijk);
 
-    double centrifugal_rad = omega * omega * rm;
-    double centrifugal_the = omega * omega * rm * fabs(sinthe);
+    // ===== THE CENTRIFUGAL FORCE POINTS AWAY FROM THE ROTATION AXIS =====
+    //
+    // Ported from ATJUP 8649675 via ATURAN 4201957. Centrifugal acceleration is Omega^2 * s * s_hat
+    // with s = r*sin(theta) the distance from the ROTATION AXIS and
+    // s_hat = sin(theta)*e_r + cos(theta)*e_theta pointing away from it:
+    //
+    //     a_r     = +Omega^2 * r * sin^2(theta)
+    //     a_theta = +Omega^2 * r * sin(theta) * cos(theta)
+    //
+    // All three parts were wrong. The radial part carried NO sin^2, so it had full strength at the
+    // poles where it must vanish. The meridional part had |sin| where sin*cos belongs — neither the
+    // right magnitude nor equator-directed, and the absolute value destroyed the hemispheric
+    // antisymmetry, pushing both hemispheres the same way. And both entered rhs_* through a MINUS,
+    // pointing the force TOWARD the axis rather than away from it; they now enter through a plus.
+    //
+    // The prerequisite is satisfied: ATJUP needed 53e75b2 first because its cos(theta) had been
+    // made absolute, and ATNEPT's costhe_tbl is cos(the.z[j]) with no fabs.
+    //
+    // ON ATURAN THIS WAS ALMOST ENTIRELY ABSORBED — every field moved in the 7th significant figure
+    // — because the CORRECTED force is exactly grad(Omega^2 r^2 sin^2/2), curl-free, and the
+    // pressure projection takes all of it. The OLD form was not a gradient, so it had a curl and
+    // could drive a spurious flow; this removes that, and adds no real driver.
+    //
+    // STILL WRONG, left for the sinthe_true port (ATJUP 7782207): `sinthe` is the CLAMPED metric
+    // value, so sin^2 reads its floor squared at the poles rather than 0 — a metric guard leaking
+    // into a body force.
+    //
+    // ATNEPT_CENT_LEGACY=1 restores the pre-port form AND entry sign together, since neither is
+    // meaningful without the other.
+    static const bool cent_legacy = [](){
+        const char* e = getenv("ATNEPT_CENT_LEGACY"); return e && atoi(e) != 0; }();
+    double centrifugal_rad, centrifugal_the;
+    if(cent_legacy){
+        centrifugal_rad = omega * omega * rm;
+        centrifugal_the = omega * omega * rm * fabs(sinthe);
+    } else {
+        centrifugal_rad = omega * omega * rm * sinthe * sinthe;
+        centrifugal_the = omega * omega * rm * sinthe * costhe;
+    }
 
     double coeff_energy_p = u_0 * u_0 / (cp_mix * t_ref);
 
@@ -397,7 +465,8 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
         - transport_u
         + diffusion_u / re_eff + diffusion_u * nue_t
         - Coriolis    * scale_Cor * Coriolis_rad
-        - centrifugal * scale_cen * centrifugal_rad
+        // PLUS: the force points away from the axis. See the block where it is formed.
+        + (cent_legacy ? -1.0 : +1.0) * centrifugal * scale_cen * centrifugal_rad
         - sponge * u_ijk;
 
     rhs_v.x[i][j][k] =
@@ -406,7 +475,7 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
         - transport_v
         + diffusion_v / re_eff + diffusion_v * nue_t
         - Coriolis    * scale_Cor * Coriolis_the
-        - centrifugal * scale_cen * centrifugal_the;
+        + (cent_legacy ? -1.0 : +1.0) * centrifugal * scale_cen * centrifugal_the;
 
     rhs_w.x[i][j][k] =
         - dpdphi_term
