@@ -238,14 +238,20 @@ This defect was found in ATURAN and the same check was then run here. ATSAT and 
 both deleted their per-planet solvers and bind straight to the shared red-black
 `PressureSolver<Planet>`, which is byte-identical in all four repositories.
 
-**What remains is a diagnostic, and it is NOT a race.** Above one thread the log's
-saturation-adjustment block — `i_sat`/`j_sat`/`k_sat`, `iter_prec_found`, and the `p_stat`, `T`,
-`saturation` and per-species `humid/cloud/ice` values printed with them — still varies run to run.
-That block is filled under `#pragma omp critical` and records *the last cell that satisfied the
-condition*, so the winner depends on thread arrival order by construction. It is properly
-synchronised, it writes reporting variables only, and every output file is bit-identical across it:
-those are the only log lines that differ, checked line-kind by line-kind. Read `i_sat` as "an
-example cell", not "the cell", whenever threads > 1.
+**The log is byte-comparable at any thread count too.** The saturation-adjustment block —
+`i_sat`/`j_sat`/`k_sat`, `iter_prec_found`, and the `p_stat`, `T`, `saturation` and per-species
+`humid/cloud/ice` values printed with them — was for a while the only thing that still varied.
+It is filled under `#pragma omp critical` in `SaturationAdjustmentNept.cpp` and used to record
+whichever cell reached the section *last*, so the winner followed thread arrival order. That was
+never a race — the section is properly synchronised and writes reporting variables only, and every
+output file was bit-identical across it — but it made logs from different thread counts impossible
+to diff.
+
+The winner is now chosen by **position** instead: the loop nest is `k`, then `j`, then `i`, so
+serial traversal visits `key = (k·jm + j)·im + i` in increasing order and "the last cell found
+wins" is exactly "the largest key wins". Taking the maximum reproduces the single-threaded answer
+at any thread count. **Which cell is reported did not change** — at 1 thread the log is unchanged
+line for line; at 16 threads it now matches it, and two 16-thread runs match each other.
 
 ### Python
 
