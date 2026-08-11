@@ -378,11 +378,11 @@ None of these stops a run; all of them affect what a result means.
    | coupling | OLR/in | T(τ=1) | τ=1 [bar] | T(i=40) top | T(i=0) deep | raw \|tendency\| max | cells capped |
    |---|---|---|---|---|---|---|---|
    | **0 (off)** | **135.601** | **203.36** | 0.0576 | 199.73 | 609.80 | — | — |
-   | 1.0 | 135.600 | 203.36 | 0.0576 | 199.73 | 609.80 | 1.37e−4 | 0 % |
-   | 1e3 | 134.060 | 202.76 | 0.0576 | 199.10 | 609.70 | 0.137 | 0 % |
-   | 1e4 | 133.036 | 202.35 | 0.0576 | 198.73 | 608.85 | 1.374 | 3.5 % |
-   | 3e4 | 138.297 | 204.31 | 0.0576 | 200.65 | 607.59 | 4.121 | 35.2 % |
-   | 1e5 | 139.941 | 204.91 | 0.0576 | 201.23 | 606.21 | 13.736 | 82.1 % |
+   | 1.0 | 135.600 | 203.36 | 0.0576 | 199.73 | 609.80 | 5.04e−4 | 0 % |
+   | 1e3 | 134.060 | 202.76 | 0.0576 | 199.10 | 609.70 | 0.494 | 0 % |
+   | 1e4 | 133.036 | 202.35 | 0.0576 | 198.73 | 608.85 | 4.875 | 3.2 % |
+   | 3e4 | 138.297 | 204.31 | 0.0576 | 200.65 | 607.59 | 15.233 | 13.3 % |
+   | 1e5 | 139.941 | 204.91 | 0.0576 | 201.23 | 606.21 | 51.476 | 86.7 % |
 
    **At 1.0 — the physically correct value — the term is live but invisible.** It changes all 92
    output files, and moves OLR/in by 0.001 and no temperature in the first two decimals. That was
@@ -392,11 +392,21 @@ None of these stops a run; all of them affect what a result means.
 
    **The last two rows are the limiter, not the term, and the cap was measured rather than
    inferred.** The last two columns come from an instrumented build that records the raw tendency
-   before capping. `raw |tendency| max` scales exactly ×10 per decade of coupling — 1.37e−4, 0.137,
-   1.374, 4.121, 13.736 — which is the linearity the formula asserts, and is a check on the
-   arithmetic. The cap bites 3.5 % of cells at 1e4, 35 % at 3e4 and 82 % at 1e5, so **the trend
-   reverses exactly where capping stops being marginal**: above 1e4 the term redistributes by where
-   the cap bites and *warms* the top instead of cooling it.
+   before capping, over the same 224 iterations as the rest of the row. The cap bites no cell at all
+   at 1.0 and 1e3, 3.2 % of cells at 1e4, 13.3 % at 3e4 and 86.7 % at 1e5, so **the trend reverses
+   exactly where capping stops being marginal**: above 1e4 the term redistributes by where the cap
+   bites and *warms* the top instead of cooling it.
+
+   **The cap column was first measured at nm=8 and those numbers were wrong.** This item as first
+   committed in `c5e7d74` read 1.37e−4 / 0.137 / 1.374 / 4.121 / 13.736 for the raw tendency and
+   0 / 0 / 3.5 / 35.2 / 82.1 % for the capped fraction, from 8-iteration runs printed beside a
+   224-iteration table. The raw tendency depends on the `Q_rad`/ρ profile, and that profile moves a
+   long way over a run — this column's top goes from 90 K to 200 K — so the short runs understated
+   it by roughly 3.6× and mis-stated the 3e4 fraction as 35 % against a true 13 %. The physics
+   columns were unaffected: an instrumented run reproduces every OLR/in and T(τ=1) in this table
+   exactly, which is what says the diagnostic does not perturb the model. **The conclusion is
+   unchanged** — 1.0 and 1e3 clean, 1e4 marginal, the reversal where capping becomes substantial —
+   but the numbers behind it are these, not those.
 
    **Read the two clean rows and one nearly-clean one, and they say the term cannot reach the
    answer.** Across 0 → 1e3 → 1e4, four orders of magnitude of coupling, T(τ=1) falls **203.36 →
@@ -406,9 +416,13 @@ None of these stops a run; all of them affect what a result means.
    this run length**, more decisively than on ATURAN, where the same sweep moved the photosphere a
    few per cent. It is committed as the missing anchor and as a measurement instrument, not as a fix.
 
-   **This differs from ATURAN's item 3 in where the cap starts.** That file reads its 1e4 and 3e4
-   rows as sub-cap; here 1e4 is already 3.5 % capped. ATURAN's cap fractions were never measured, so
-   the two files are not in conflict — ATURAN's simply has not had this instrument run against it.
+   **The cap starts about a decade lower here than on Uranus, and that is now measured on both.**
+   The same instrument run against ATURAN at nm=224 gives raw tendencies of 4.39e−5, 0.0438, 0.428,
+   1.252 and 4.200 for the same five couplings, capping 0 %, 0 %, 0 %, 1.1 % and 4.7 % of cells. So
+   Uranus stays entirely sub-cap up to 1e4 and only reverses at 1e5, where this model is already
+   87 % capped at the same setting. Neptune's raw tendency runs **11–12× Uranus's coupling for
+   coupling**, which is what a hotter, thinner-topped column does to `Q_rad`/ρ. The two files
+   describe different planets, not a disagreement.
 
 ---
 
