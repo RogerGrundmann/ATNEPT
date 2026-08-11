@@ -290,7 +290,7 @@ None of these stops a run; all of them affect what a result means.
    | 28 | 618.71 | 429.72 | 206.32 | 421.72 |
 
    The deep loses **109.04 K**, the top gains **116.23 K**, and the mean rises **12.38 K (+3.02 %)**.
-   So there *is* a genuine net heat gain — unlike ATURAN, whose mean **falls** 0.9 % over the same
+   So there *is* a genuine net heat gain — unlike ATURAN, whose mean **falls** 0.98 % over the same
    run and whose fault is purely redistributive — but it is not what dominates: the vertical
    redistribution is roughly **9× larger** than the net gain. Thermal diffusion flattens the initial
    adiabat, nothing anchors the top of the column to the planet's energy budget, and the photosphere
