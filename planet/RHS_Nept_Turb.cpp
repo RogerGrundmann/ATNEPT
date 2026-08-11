@@ -397,11 +397,71 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
     static const double tmf_scale = [](){
         const char* e = getenv("ATNEPT_THERMAL_MASSFLUX"); return e ? atof(e) : 1.0; }();
 
+    // ===== Radiative heating source (ATNEPT_RAD_COUPLING, default 0 = off, bit-identical) =====
+    //
+    // ATJUP's term, ported unchanged in form (RHS_Jup_Turb.cpp) by way of ATURAN's. Converts the
+    // diagnostic radiative flux divergence Q_rad [W/m3], which Radiation.h fills, into a
+    // nondimensional temperature tendency: physically dT/dt = Q_rad/(rho*cp), nondimensionalised by
+    // this model's energy-equation scaling (radial length L_rad, velocity u_0, temperature t_ref):
+    //
+    //      radiation_t = rad_coupling * Q_rad * L_rad / (rho * cp_mix * u_0 * t_ref)
+    //
+    // with ATJUP's rad_t_max = 0.5 limiter, non-finite guarded BEFORE the cap because the cap's two
+    // comparisons are both false for a NaN and would pass it through.
+    //
+    // rho is the LOCAL density, not r_mix, so the thin cold top responds instead of being held by
+    // the deep column. It is read from rho_mix with an ideal-gas fallback — ATJUP's form rather
+    // than ATSAT's r_mix fallback, and for a reason particular to this model as it was on ATURAN:
+    // ChemistryNept.h fills rho_mix UNGUARDED, dividing by t.x with no positivity test, so the
+    // array can hold inf or a negative where ATSAT's would hold 0.0. The test used is
+    // (rho_f > 0.0 && isfinite(rho_f)), which rejects exactly those. rho_mix is filled by
+    // DiffMassFluxNept/ChemMassRateNept before RungeKuttaNept runs, so the fallback is for safety
+    // rather than for ordering.
+    //
+    // L_rad is L_atm converted to METRES. L_atm is in km on all four models, and this is the same
+    // conversion computeHydrostaticPressure() still drops on this model: its nd reads
+    // 1.0e5 * L_atm / (u_0*u_0) with no 1.0e3, where ATURAN's reads
+    // 1.0e5 * (L_atm * 1.0e3) / (u_0*u_0) since 9da831a. That defect is ATNEPT's and is untouched
+    // here — this term gets the factor right rather than inheriting the omission.
+    //
+    // WHAT IT IS FOR. README item 1: over 224 iterations this column redistributes far more than it
+    // heats — the deep loses 109.04 K, the top gains 116.23 K, and the mean rises only 12.38 K
+    // (+3.02 %). Nothing ties the top of the column to the planet's energy budget, which is why the
+    // photosphere reads 205.74 K against a T_eff(in) of 59.28 K. This term is that missing anchor.
+    // It is NOT expected to close the gap: measured on ATURAN, coupling 1.0 is invisible (the
+    // radiative relaxation time vastly exceeds the step) and the answer only moves below the 0.5
+    // limiter, monotonically but by a few per cent. Neptune is colder still.
+    //
+    // rad_coupling = 1.0 IS THE PHYSICALLY CORRECT VALUE — the expression is the exact
+    // nondimensional form of dT/dt = Q/(rho*cp) under this scaling. Values >> 1 are not a scaling
+    // correction but a deliberate ACCELERATION factor, and should be named as such when used.
+    static const double rad_coupling = [](){
+        const char* e = getenv("ATNEPT_RAD_COUPLING"); return e ? atof(e) : 0.0; }();
+    double radiation_t = 0.0;
+    if(rad_coupling != 0.0){
+        const double T_phys = t.x[i][j][k] * t_ref;            // [K]
+        const double P_phys = p_stat.x[i][j][k] * 1.0e5;       // p_stat is in bar -> [Pa]
+        const double rho_f  = rho_mix.x[i][j][k];
+        const double rho    = (rho_f > 0.0 && std::isfinite(rho_f))
+                            ? rho_f
+                            : ((T_phys > 1.0) ? P_phys / (R_mix * T_phys) : 0.0);  // [kg/m3]
+        const double L_rad  = L_atm * 1.0e3;                   // atmosphere thickness [m]
+        if(rho > 0.0 && cp_mix > 0.0){
+            radiation_t = rad_coupling * Q_rad.x[i][j][k] * L_rad
+                        / (rho * cp_mix * u_0 * t_ref);
+            constexpr double rad_t_max = 0.5;
+            if(!std::isfinite(radiation_t)) radiation_t = 0.0;
+            else if(radiation_t >  rad_t_max) radiation_t =  rad_t_max;
+            else if(radiation_t < -rad_t_max) radiation_t = -rad_t_max;
+        }
+    }
+
     rhs_t.x[i][j][k] =
         + pressure_t
         - transport_t
         + diffusion_t / (re * pr) + diffusion_t * nue_t_s
-        - tmf_scale * chemical_reaction * thermalmassflux.x[i][j][k];
+        - tmf_scale * chemical_reaction * thermalmassflux.x[i][j][k]
+        + radiation_t;
 
     // Quadratic sponge layer damping over the top quarter of the domain
     const double frac_sp = std::max(0.0, (double)(i - (im - 1) * 3 / 4) / (double)((im - 1) / 4));

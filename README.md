@@ -134,14 +134,16 @@ diff ../ATJUP/planet/SHARED.md5 planet/SHARED.md5
 ## Optional modules
 
 Every module is **off by default** and a stock run is unaffected by its presence. Set the
-environment variable to enable. All of them fill diagnostic arrays; none feeds back into the
-temperature equation on this model — there is no `ATNEPT_RAD_COUPLING`, unlike ATJUP.
+environment variable to enable. All of them fill diagnostic arrays. Only one of them can feed back
+into the temperature equation — `ATNEPT_RAD_COUPLING`, added last of the four models; precipitation
+and turbulence remain diagnostic-only here.
 
 **Radiation** — grey two-stream, shared `Radiation.h`
 
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `ATNEPT_RADIATION` | 0 | run the solve; fills `Q_rad`, `radiation`, `epsilon` |
+| `ATNEPT_RAD_COUPLING` | 0.0 | add `Q_rad` to `rhs_t` as `Q_rad·L_rad/(ρ·cp·u_0·t_ref)`. **1.0 is the physically correct value, not a starting point** — see *Known limitations* for why it is invisible at that setting and what the sweep measured |
 | `ATNEPT_SOLAR` | 1 | absorbed shortwave channel (only acts with `ATNEPT_RADIATION`) |
 | `ATNEPT_SOLAR_STRENGTH` | 1.0 | scale the absorbed insolation |
 | `ATNEPT_SW_TAU_PER_BAR` | 1.0 | move the shortwave absorption level |
@@ -298,8 +300,16 @@ None of these stops a run; all of them affect what a result means.
    an open question**, and it is not explained. `ATNEPT_THERMAL_MASSFLUX`'s six-order dominance of
    `rhs_t` (item 3) is the obvious suspect and no more than a suspect. Anyone attacking item 1
    should separate the two components before assuming a single cause: the anchor that is missing
-   (see ATURAN's `ATURAN_RAD_COUPLING`, which this model does not yet have — item 5) and the
+   (`ATNEPT_RAD_COUPLING` now supplies it, and item 8 measures how far it reaches — not far) and the
    +3 % source, which ATURAN does not have at all.
+
+   **The numbers in this item were taken at `3c6d534` and the baseline has moved since.** Measured
+   on current HEAD, 224 iterations, radiation on, single-threaded: OLR/in **135.601** and
+   T(τ=1) **203.36 K**, against the 143× and 205.74 K quoted above. Of the five commits in between,
+   three were verified to leave every output file bit-identical, so the shift belongs to the other
+   two — the Coriolis and centrifugal corrections `024c37f` and `e412b1b`. The fault is unchanged in
+   kind and the table above has not been re-measured cell by cell; treat its columns as the shape of
+   the problem and item 8's `off` row as the current baseline.
 
 2. **That number got worse when a real bug was fixed, and the previous one was not better.** Before
    the methane-viscosity correction this model read 2.860× — an artefact of two errors partly
@@ -320,9 +330,10 @@ None of these stops a run; all of them affect what a result means.
    top of the domain at 15 bar rather than 0.025 bar. Photosphere numbers from such runs are
    measuring the ceiling of the grid.
 
-5. **The radiation, precipitation and turbulence modules are diagnostic-only here.** They fill their
-   arrays and nothing reads them back: there is no `ATNEPT_RAD_COUPLING`, `S_precip_*` reaches no
-   RHS, and `ATNEPT_TURB_COUPLING` defaults to 0.
+5. **The precipitation and turbulence modules are diagnostic-only here.** They fill their arrays and
+   nothing reads them back: `S_precip_*` reaches no RHS and `ATNEPT_TURB_COUPLING` defaults to 0.
+   Switching either on changes plots, not physics. Radiation is no longer in this list — it can now
+   reach `rhs_t` through `ATNEPT_RAD_COUPLING`, which is off by default; see item 8.
 
 6. **The metric radius was corrected and made the default, and results before that commit are not
    comparable with results after it.** `rad.z` runs 1..2, so an unshifted metric put Neptune's
@@ -352,6 +363,52 @@ None of these stops a run; all of them affect what a result means.
 
 7. **The grey opacity is Jupiter's calibration, not Neptune's.** `C_cia` and `opac_cal` were tuned so
    that Jupiter's photosphere lands at 0.25–0.35 bar. Nothing has recalibrated them here.
+
+8. **`ATNEPT_RAD_COUPLING` is the anchor item 1 asks for, and on this model it is nowhere near
+   enough.** The term is ATJUP's, ported by way of ATURAN's, and it converts the diagnostic flux
+   divergence `Q_rad` into a nondimensional temperature tendency,
+   `Q_rad·L_rad/(ρ·cp_mix·u_0·t_ref)`, under ATJUP's `rad_t_max = 0.5` limiter. It defaults to 0.
+
+   **The way back is exact.** With the knob unset, 224 iterations, radiation on: **92 of 92 output
+   files bit-identical** against `e412b1b`, the commit before the term existed, and the log differs
+   only in the `<program name>` line.
+
+   224 iterations, radiation on, single-threaded:
+
+   | coupling | OLR/in | T(τ=1) | τ=1 [bar] | T(i=40) top | T(i=0) deep | raw \|tendency\| max | cells capped |
+   |---|---|---|---|---|---|---|---|
+   | **0 (off)** | **135.601** | **203.36** | 0.0576 | 199.73 | 609.80 | — | — |
+   | 1.0 | 135.600 | 203.36 | 0.0576 | 199.73 | 609.80 | 1.37e−4 | 0 % |
+   | 1e3 | 134.060 | 202.76 | 0.0576 | 199.10 | 609.70 | 0.137 | 0 % |
+   | 1e4 | 133.036 | 202.35 | 0.0576 | 198.73 | 608.85 | 1.374 | 3.5 % |
+   | 3e4 | 138.297 | 204.31 | 0.0576 | 200.65 | 607.59 | 4.121 | 35.2 % |
+   | 1e5 | 139.941 | 204.91 | 0.0576 | 201.23 | 606.21 | 13.736 | 82.1 % |
+
+   **At 1.0 — the physically correct value — the term is live but invisible.** It changes all 92
+   output files, and moves OLR/in by 0.001 and no temperature in the first two decimals. That was
+   predicted before the run from the radiative relaxation time vastly exceeding the step, and
+   matches; a *visible* result at 1.0 would have meant a units error. Neptune is colder than Uranus,
+   where the same term was invisible at 1.0 too.
+
+   **The last two rows are the limiter, not the term, and the cap was measured rather than
+   inferred.** The last two columns come from an instrumented build that records the raw tendency
+   before capping. `raw |tendency| max` scales exactly ×10 per decade of coupling — 1.37e−4, 0.137,
+   1.374, 4.121, 13.736 — which is the linearity the formula asserts, and is a check on the
+   arithmetic. The cap bites 3.5 % of cells at 1e4, 35 % at 3e4 and 82 % at 1e5, so **the trend
+   reverses exactly where capping stops being marginal**: above 1e4 the term redistributes by where
+   the cap bites and *warms* the top instead of cooling it.
+
+   **Read the two clean rows and one nearly-clean one, and they say the term cannot reach the
+   answer.** Across 0 → 1e3 → 1e4, four orders of magnitude of coupling, T(τ=1) falls **203.36 →
+   202.35 K — about 1 K** — against the ~144 K it would have to fall to meet T_eff(in) = 59.28 K.
+   The response also saturates rather than accumulating: the first factor of 1000 buys 0.60 K and
+   the next factor of 10 buys 0.41 K. **The term is directionally right and cannot close item 1 at
+   this run length**, more decisively than on ATURAN, where the same sweep moved the photosphere a
+   few per cent. It is committed as the missing anchor and as a measurement instrument, not as a fix.
+
+   **This differs from ATURAN's item 3 in where the cap starts.** That file reads its 1e4 and 3e4
+   rows as sub-cap; here 1e4 is already 3.5 % capped. ATURAN's cap fractions were never measured, so
+   the two files are not in conflict — ATURAN's simply has not had this instrument run against it.
 
 ---
 
