@@ -450,6 +450,9 @@ public:
     // fifth to a half of its cell-calls unconverged; with them both are zero.
     static bool satadj_default_newton(){ return true; }
     static bool satadj_default_conserve(){ return true; }
+    // Shared Precipitation.h: the factor on its five rate coefficients; 1 = the Jovian set.
+    // ATNEPT_PRECIP_SCALE overrides.
+    static double precip_rate_scale(){ return 1.0; }
 
     // The model's own floor on sin(theta) in the METRIC. ATNEPT declares none, as ATSAT does not;
     // it exists so ATPhys::polar_divisor_floor<Planet>() compiles. With ATNEPT_SINTHE_TRACK unset
