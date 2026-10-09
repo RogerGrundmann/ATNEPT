@@ -245,6 +245,14 @@ public:
     std::vector<std::vector<double> > t_top_init;
 
     std::vector<Array*> bc_fields_radius();
+    // The two species floors (ATNEPT_BC_RADIUS_POSITIVE, ATNEPT_SPECIES_CLAMP, both default 1), defined
+    // in BC_Nept.h beside the note that explains them.
+    std::vector<Array*> species_fields();
+    void floorRadialSpecies();
+    void clampNegativeSpecies();
+    void clampNegativeReport();
+    std::vector<double> clamp_added;
+    std::vector<long>   clamp_cells;
     std::vector<Array*> bc_fields_theta_extrap();
     std::vector<Array*> bc_fields_theta_zero();
     std::vector<Array*> bc_fields_phi();

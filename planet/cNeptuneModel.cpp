@@ -442,6 +442,7 @@ void cNeptuneModel::Run(){
         BC_Nept(*this).bcRadius();                                      // extrapolation in i-direction along grid boundaries
         BC_Nept(*this).bcTheta();                                       // extrapolation in j-direction along grid boundaries
         BC_Nept(*this).bcPhi();                                         // extrapolation in k-direction along grid boundaries
+        clampNegativeSpecies();                                         // ATNEPT_SPECIES_CLAMP, default on (BC_Nept.h)
 
         // How far the run is from a steady state, and WHERE. MUST run BEFORE restoreVar: it
         // differences each field against the n-copy restoreVar is about to overwrite, so after
@@ -477,6 +478,8 @@ void cNeptuneModel::Run(){
         printf(" time measured: %.3f seconds for one time step\n", elapsed.count() * 1e-9);
 
     }  // end for iter_n
+
+    clampNegativeReport();
 
     cout << endl << "      ATNEPT: run_3D_loop ended ..........................." << endl;
 
