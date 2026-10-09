@@ -437,6 +437,8 @@ public:
     static bool satadj_updates_pstat(){ return false; }
     // Default of ATNEPT_SATADJ_NEWTON (shared SaturationAdjustment.h): off, not run here yet.
     static bool satadj_default_newton(){ return false; }
+    // Default of ATNEPT_SATADJ_CONSERVE (shared SaturationAdjustment.h): off, not run here yet.
+    static bool satadj_default_conserve(){ return false; }
 
     // The model's own floor on sin(theta) in the METRIC. ATNEPT declares none, as ATSAT does not;
     // it exists so ATPhys::polar_divisor_floor<Planet>() compiles. With ATNEPT_SINTHE_TRACK unset
