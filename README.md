@@ -159,7 +159,7 @@ and turbulence remain diagnostic-only here.
 | `ATNEPT_TURB_MODEL` | *param* | override `turb_model` (`k_epsilon`, `k_omega`, `k_omega_SST`) |
 | `ATNEPT_TURB_COUPLING` | 0.0 | feed the eddy viscosity into momentum, heat and species diffusion |
 | `ATNEPT_CONV_ADJ` | 0 | dry convective adjustment |
-| `ATNEPT_SATADJ` | *see code* | mirrored saturation adjustment |
+| `ATNEPT_SATADJ` | 1 | shared saturation adjustment, the default since 2026-10-10 (0 = the inherited routine) |
 | `ATNEPT_CHEM_ENTHALPY` | *see code* | reaction-enthalpy branch in `thermalmassflux` |
 
 **Numerics and experiment knobs**
