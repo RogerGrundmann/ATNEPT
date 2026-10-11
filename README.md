@@ -142,7 +142,7 @@ and turbulence remain diagnostic-only here.
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `ATNEPT_RADIATION` | 0 | run the solve; fills `Q_rad`, `radiation`, `epsilon` |
+| `ATNEPT_RADIATION` | 1 | default since 2026-10-11, 0 = off; run the solve; fills `Q_rad`, `radiation`, `epsilon` |
 | `ATNEPT_RAD_COUPLING` | 0.0 | add `Q_rad` to `rhs_t` as `Q_rad·L_rad/(ρ·cp·u_0·t_ref)`. **1.0 is the physically correct value, not a starting point** — see *Known limitations* for why it is invisible at that setting and what the sweep measured |
 | `ATNEPT_SOLAR` | 1 | absorbed shortwave channel (only acts with `ATNEPT_RADIATION`) |
 | `ATNEPT_SOLAR_STRENGTH` | 1.0 | scale the absorbed insolation |
@@ -189,7 +189,7 @@ Printed at the `checkpoint` cadence:
   `init_PressureStatic` anchoring `p_bottom` against `T/t_ref` instead of `T/T_bottom`, inflating the
   whole pressure field by 607× and putting the **top of the domain at 15 bar**. One column of
   `p[bar]` shows that at a glance; no column-averaged number can.
-- **Photosphere line** (with `ATNEPT_RADIATION=1`) — mean OLR against the input budget, the τ=1 level
+- **Photosphere line** (printed unless `ATNEPT_RADIATION=0`) — mean OLR against the input budget, the τ=1 level
   in bar, and the temperature there beside the blackbody flux it implies. Note `T_eff(in)` already
   includes `F_int`, so on a planet with a large internal flux the photosphere should still approach
   it; the internal flux does not excuse an excess.

@@ -50,8 +50,8 @@ static int press_solver_shared(){
 }
 
 // Grey multi-layer radiation (RadiationNept), the SHARED Radiation<Planet> that ATSAT and ATJUP
-// already run. DEFAULT OFF, so every existing ATNEPT run stays byte-identical; ATNEPT_RADIATION=1
-// switches it on. It fills the DIAGNOSTIC arrays radiation / epsilon / Q_rad and touches neither t
+// already run. DEFAULT ON since 2026-10-11 on the user's word; ATNEPT_RADIATION=0 restores the run
+// without it (not byte-checked). It fills the DIAGNOSTIC arrays radiation / epsilon / Q_rad and touches neither t
 // nor any rhs — wiring the heating into the temperature equation is a separate step, as it was on
 // the other two models.
 //
@@ -91,7 +91,7 @@ static int turb_env_enabled(){
 }
 
 static int radiation_enabled(){
-    static const int v = [](){ const char* e = getenv("ATNEPT_RADIATION"); return e ? atoi(e) : 0; }();
+    static const int v = [](){ const char* e = getenv("ATNEPT_RADIATION"); return e ? atoi(e) : 1; }();
     return v;
 }
 

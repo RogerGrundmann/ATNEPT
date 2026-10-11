@@ -87,7 +87,7 @@ void cNeptuneModel::printMinMax(){
     cout << endl;
 
     // The radiation scheme's own fields, on exactly the argument the precipitation block above
-    // makes: zero unless ATNEPT_RADIATION is set, printed regardless, so that switching the knob
+    // makes: zero when ATNEPT_RADIATION=0, printed regardless, so that switching the knob
     // on produces something visible. Radiation.h has been filling these three arrays on this model
     // since the port and NOTHING read them — not this file, not ParaView — which is why every
     // number known about ATNEPT's radiation so far came from the one stdout line in the shared
