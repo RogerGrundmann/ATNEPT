@@ -130,6 +130,7 @@ public:
     static int bc_default_top_taper(){ return 0; }
     static int bc_default_pole_copy(){ return 0; }
     static int bc_default_radius_copy(){ return 0; }
+    static int bc_pole_open_rows(){ return 0; }   // rows next to each pole that RungeKutta does not integrate (<TAG>_BC_POLE_FILL)
 
     // Snapshot of the lid temperature, for the shared BoundaryConditions' lid-pin knob. It is
     // DECLARED here and filled by the shared header itself, lazily, on the first call with the pin
