@@ -5,6 +5,7 @@
 */
 
 #include "cNeptuneModel.h"
+#include "TbNept.h"
 
 using namespace std;
 
@@ -395,7 +396,7 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
     // at ~2.7 bar with a decoupled warm blob above it whose top is what the photosphere diagnostic
     // then reads. See the measurement in the commit that added this knob.
     static const double tmf_scale = [](){
-        const char* e = getenv("ATNEPT_THERMAL_MASSFLUX"); return e ? atof(e) : 1.0; }();
+        const char* e = getenv("ATNEPT_THERMAL_MASSFLUX"); return e ? atof(e) : 0.0; }();   // 0 since 2026-10-11, see ATNEPT_DAMP_T_VERT in cNeptuneModel.cpp; 1 restores
 
     // ===== Radiative heating source (ATNEPT_RAD_COUPLING, default 0 = off, bit-identical) =====
     //
@@ -462,6 +463,25 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
         + diffusion_t / (re * pr) + diffusion_t * nue_t_s
         - tmf_scale * chemical_reaction * thermalmassflux.x[i][j][k]
         + radiation_t;
+
+    // ATNEPT_TB_DIAG (print-only, see TbNept.h): RK4-weighted level sums of each term of rhs_t, per
+    // thread. Nothing here is read by the model.
+    if(NeptTb::st().on && i < NeptTb::MAXLEV){
+        const double cw = NeptTb::st().stage_wgt * std::sin(the.z[j]);
+        #ifdef _OPENMP
+            const int th_ = omp_get_thread_num();
+        #else
+            const int th_ = 0;
+        #endif
+        double (*a_)[NeptTb::MAXLEV] = NeptTb::st().acc[th_];
+        a_[NeptTb::T_PRESS][i]  += cw * pressure_t;
+        a_[NeptTb::T_TR_RAD][i] -= cw * u_ijk * dtdr;
+        a_[NeptTb::T_TR_THE][i] -= cw * v_invrm * dtdthe;
+        a_[NeptTb::T_TR_PHI][i] -= cw * w_invrs * dtdphi;
+        a_[NeptTb::T_DIFF][i]   += cw * (diffusion_t / (re * pr) + diffusion_t * nue_t_s);
+        a_[NeptTb::T_TMF][i]    -= cw * tmf_scale * chemical_reaction * thermalmassflux.x[i][j][k];
+        a_[NeptTb::T_RAD][i]    += cw * radiation_t;
+    }
 
     // Quadratic sponge layer damping over the top quarter of the domain
     const double frac_sp = std::max(0.0, (double)(i - (im - 1) * 3 / 4) / (double)((im - 1) / 4));

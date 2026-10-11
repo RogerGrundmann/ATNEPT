@@ -166,7 +166,10 @@ and turbulence remain diagnostic-only here.
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `ATNEPT_THERMAL_MASSFLUX` | 1.0 | scale the diffusive-enthalpy sink in `rhs_t` — see *Known limitations* |
+| `ATNEPT_THERMAL_MASSFLUX` | 0.0 since 2026-10-11 (was 1.0) | scale the diffusive-enthalpy sink in `rhs_t` — see *Known limitations* |
+| `ATNEPT_DAMP_T_VERT` | 0.0 | since 2026-10-11 (was 1.0, without a knob): strength of the vertical pass of the Shapiro filter on `t`; the horizontal passes are untouched |
+| `ATNEPT_RK_SCALAR_SYNC` | 2 | since 2026-10-11: the Runge-Kutta step starts from the state the saturation adjustment left (2 = condensate and temperature, 1 = condensate only, 0 = before: both discarded every step) |
+| `ATNEPT_TB_DIAG=<n>` | off | print-only: every n iterations, which stage of the loop and which term of `rhs_t` changed the level-mean temperature (`planet/TbNept.h`) |
 | `ATNEPT_SINTHE_MIN` | 0.0 | env floor on sin θ — **not the value in force**: the integrator uses a hardcoded `sinthe_min = 0.4`, so this accessor is not consulted by default |
 | `ATNEPT_PRESS_SOLVER` | *see code* | pressure-solver selection |
 | `ATNEPT_STEADY` | 1 | steady-state query in the report |
@@ -273,6 +276,18 @@ radial, zonal, and longitudinal cross-sections).
 ---
 
 ## Known limitations
+
+> **State of 2026-10-11 — read this before the numbered items.** Three defaults changed that day and
+> the items below were measured before them: `ATNEPT_DAMP_T_VERT` 0 (the vertical pass of the Shapiro
+> filter on `t` is off), `ATNEPT_THERMAL_MASSFLUX` 0 (the diffusive-enthalpy term is out of `rhs_t`) and
+> `ATNEPT_RK_SCALAR_SYNC` 2 (the time step keeps the saturation adjustment's condensate and latent heat
+> instead of discarding them). `ATNEPT_TB_DIAG=<n>` (print-only, `planet/TbNept.h`) charges the level-mean
+> temperature change to each stage of the loop and each term of `rhs_t`; over 224 iterations it gives,
+> at levels 1 / 20 / 35 / 39, **-132.1 / +2.3 / +62.3 / +127.7 K before and -5.5 / -1.1 / +1.1 / +7.6 K after**, mean OLR **94.9 → 5.98 W/m²** against 0.700 in
+> and a photosphere of **203.1 → 83.3 K**. The filter was the drift; with it off the thermal mass flux
+> term dug a cold hole (-51 K at level 35), so both went together. What remains is the diffusion term at the two
+> radial ends and a rougher profile. Each knob set to its old value (1, 1, 0) restores the model the
+> items below describe.
 
 None of these stops a run; all of them affect what a result means.
 

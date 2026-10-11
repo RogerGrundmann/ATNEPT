@@ -1,4 +1,5 @@
 #include "cNeptuneModel.h"
+#include "TbNept.h"
 
 using namespace std;
 
@@ -153,6 +154,7 @@ void cNeptuneModel::RungeKuttaNept(){
 
         const double c_in = (stage == 0 || stage == 1) ? 0.5 * dt : (stage == 2 ? dt : 0.0);
         const double wgt  = (stage == 0 || stage == 3) ? 1.0 : 2.0;
+        NeptTb::st().stage_wgt = wgt;                 // ATNEPT_TB_DIAG: weight of the tendencies RHSNept is about to sum
 
         // ---- pass A: evaluate the right-hand sides ----
         #pragma omp parallel for collapse(2) schedule(static)
