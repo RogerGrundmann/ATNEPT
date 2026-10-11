@@ -155,7 +155,7 @@ and turbulence remain diagnostic-only here.
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `ATNEPT_PRECIP` | 0 | precipitation scheme; fills `P_*`, `Q_precip`, `S_precip_*` (diagnostic only here) |
-| `ATNEPT_TURB` | 0 | run the closure |
+| `ATNEPT_TURB` | unset | the closure runs whenever `turb_model` is not `none` (default since 2026-10-11); `ATNEPT_TURB=0` switches it off |
 | `ATNEPT_TURB_MODEL` | *param* | override `turb_model` (`k_epsilon`, `k_omega`, `k_omega_SST`) |
 | `ATNEPT_TURB_COUPLING` | 0.0 | feed the eddy viscosity into momentum, heat and species diffusion |
 | `ATNEPT_CONV_ADJ` | 0 | dry convective adjustment |
@@ -356,10 +356,8 @@ None of these stops a run; all of them affect what a result means.
    dynamics rebalance, and proportionality was never the right test. **This is not a fix for item
    1**: OLR/in moves 5 %, because that fault is vertical and this correction is horizontal.
 
-   Two sites still read `rad.z` raw: `Turbulence.h:490` and `:705`. That file is **shared**, so
-   changing it costs the four-repo protocol, and `ATNEPT_TURB` defaults off — so they are inert in
-   a stock run. Switching the closure on together with the corrected metric means closing that gap
-   first.
+   The two sites in the shared `Turbulence.h` that read `rad.z` raw take the metric radius since
+   2026-10-11, the day the closure became part of a stock run (`turb_model` is the switch).
 
 7. **The grey opacity is Jupiter's calibration, not Neptune's.** `C_cia` and `opac_cal` were tuned so
    that Jupiter's photosphere lands at 0.25–0.35 bar. Nothing has recalibrated them here.
