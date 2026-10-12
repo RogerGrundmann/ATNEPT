@@ -25,7 +25,7 @@ models (ATJUP, ATSAT).
 ## Physics & Numerics
 
 - **Domain:** spherical shell, 41 × 181 × 361 grid points (r × θ × φ), ~2.7 million cells
-- **Vertical extent:** 550 km atmospheric shell (~13.75 km per radial step)
+- **Vertical extent:** 200 km atmospheric shell (5 km per radial step), 31.5 bar to 0.03-0.045 bar; 550 km before 2026-10-12
 - **Dynamics:** finite-difference discretisation of the 3-D Navier-Stokes equations in spherical coordinates
 - **Time integration:** 4th-order Runge-Kutta (inner loop) with a Poisson pressure solver (outer loop)
 - **Parallelism:** OpenMP shared-memory threading
@@ -166,6 +166,7 @@ and turbulence remain diagnostic-only here.
 
 | Variable | Default | Effect |
 |----------|---------|--------|
+| `ATNEPT_T_INIT_ANCHOR` | 1 | since 2026-10-12: the initial profile is ONE adiabat through 72 K at 1 bar from `ATNEPT_P_BOTTOM` (31.5 bar, 254.8 K) upwards, isothermal at `t_equator`..`t_pole` above the level where it reaches them; the reference densities are scaled by one factor (3.01) to that bottom state. The config defaults went with it: `L_atm` 550 → 200 km, `tropopause_pole` 250 → 150, `tropopause_equator` 200 → 156. `0` **together with those three old values** restores the profile before (724 K at 31.5 bar: the same adiabat anchored at 0.058 bar) |
 | `ATNEPT_THERMAL_MASSFLUX` | 0.0 since 2026-10-11 (was 1.0) | scale the diffusive-enthalpy sink in `rhs_t` — see *Known limitations* |
 | `ATNEPT_DAMP_T_VERT` | 0.0 | since 2026-10-11 (was 1.0, without a knob): strength of the vertical pass of the Shapiro filter on `t`; the horizontal passes are untouched |
 | `ATNEPT_RK_SCALAR_SYNC` | 2 | since 2026-10-11: the Runge-Kutta step starts from the state the saturation adjustment left (2 = condensate and temperature, 1 = condensate only, 0 = before: both discarded every step) |
@@ -277,6 +278,14 @@ radial, zonal, and longitudinal cross-sections).
 
 ## Known limitations
 
+> **State of 2026-10-12 — the initial profile changed.** `ATNEPT_T_INIT_ANCHOR` 1 and a 200 km shell are the
+> default (see the knob table). Every number below, and the note of 2026-10-11 that follows, was measured on the
+> 550 km profile that reached 724 K. On the new one, 16 iterations at the defaults: bottom 254.8 K at 31.5 bar, lid
+> 0.031 bar (equator) to 0.045 bar (poles), mean OLR **0.80 W/m² against 0.700 in** (5.5 to 9 before), photosphere
+> 61.6 K at 0.048 bar. Not changed: the species are initialised from constant reference densities, so the CH4
+> ice above 1 bar is heavier than the gas it sits in (max 542 g/m³), and the first saturation adjustment warms the
+> bottom by about 10 K.
+>
 > **State of 2026-10-11 — read this before the numbered items.** Three defaults changed that day and
 > the items below were measured before them: `ATNEPT_DAMP_T_VERT` 0 (the vertical pass of the Shapiro
 > filter on `t` is off), `ATNEPT_THERMAL_MASSFLUX` 0 (the diffusive-enthalpy term is out of `rhs_t`) and

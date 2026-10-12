@@ -13,9 +13,9 @@
         <chemical_reaction>1</chemical_reaction>  <!-- chemical reactions included (double) -->
         <epsres>1e-05</epsres>  <!-- accuracy of relative and absolute errors (double) -->
         <turb_model>k_omega_SST</turb_model>  <!-- turbulence model: none, k_epsilon, k_omega, k_omega_SST (string) -->
-        <L_atm>550.0</L_atm>  <!-- extension of the atmosphere shell in km, 550km/40 steps = 137.5km (double) -->
-        <tropopause_pole>250.0</tropopause_pole>  <!-- extension of the troposphere at the poles in km (double) -->
-        <tropopause_equator>200.0</tropopause_equator>  <!-- extension of the troposphere at the equator in km (double) -->
+        <L_atm>200.0</L_atm>  <!-- extension of the atmosphere shell in km, 200km/40 steps = 5km (550 before 2026-10-12, with ATNEPT_T_INIT_ANCHOR=0) (double) -->
+        <tropopause_pole>150.0</tropopause_pole>  <!-- extension of the troposphere at the poles in km (250 before 2026-10-12) (double) -->
+        <tropopause_equator>156.0</tropopause_equator>  <!-- extension of the troposphere at the equator in km (200 before 2026-10-12) (double) -->
         <re>1000.0</re>  <!-- Reynolds number: ratio viscous to inertia forces, Re = u * L/nue (double) -->
         <ec>0.00044</ec>  <!-- Eckert number: ratio kinetic energy to enthalpy, Ec = u²/cp T (double) -->
         <ep>0.623</ep>  <!-- ratio of the gas constants of dry air to water vapour [/] (double) -->

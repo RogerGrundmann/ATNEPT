@@ -103,7 +103,46 @@ public:
      * constructs rather than at a temperature Neptune is believed to reach.
      */
     static double t_min_K(){ return 7.5;    }   // floor; prevents a buoyancy blow-up
-    static double t_max_K(){ return 2000.0; }   // ceiling; well above the 1111 K init_temperature builds
+    static double t_max_K(){ return 2000.0; }   // ceiling; well above anything init_temperature builds (255 K; 724 K before 2026-10-12)
+
+    // ---- ATNEPT_T_INIT_ANCHOR (2026-10-12; DEFAULT 1 on the user's word, 0 = the profile as before) ----
+    //
+    // The initial profile hangs ONE dry adiabat from the prescribed top temperature through the
+    // whole shell, T_bottom = T_top + gam * L_atm, and takes the bottom pressure from the
+    // reference density, p_bottom = r_mix * R_mix * T_bottom. With L_atm = 550 km that is 724 K
+    // at 31.5 bar. The adiabat itself is a fair one; its pressure anchor is not: it passes 72 K
+    // at 0.058 bar, where Neptune has 72 K at 1 bar (Lindal 1992), so at every pressure the
+    // model is 17^(1/n) = 2.8 times too hot. A 550 km adiabat through 72 K at 1 bar would end
+    // near 540 bar.
+    //
+    // 1 builds the profile from the anchor instead (the config defaults went with it: L_atm
+    // 550 -> 200 km, tropopause_pole 250 -> 150, tropopause_equator 200 -> 156; the old model is
+    // the knob at 0 TOGETHER WITH those three old values):
+    //   - one adiabat for every latitude through t_1bar_K() at 1 bar, from the bottom pressure
+    //     p_bottom_bar() upwards: T_bottom = t_1bar * p_bottom^(1/n), n = g / (gam * R_ref);
+    //   - where it has cooled to the prescribed top temperature (t_equator .. t_pole, read as
+    //     the tropopause temperature) the profile turns isothermal, with the hydrostatic
+    //     pressure of an isothermal layer above;
+    //   - the seven reference densities r_x (and the molar c_x) are scaled by ONE factor so that
+    //     p_bottom = r_mix * R_mix * T_bottom still holds: the buoyancy term reads
+    //     g * p / (r_mix * R_mix * T) and must be g at the bottom. cp_mix, R_mix and gam are
+    //     ratios of the r_x and do not move.
+    // L_atm stays the config's: with p_bottom = 31.5 bar the lid is at 0.03 .. 0.045 bar for
+    // L_atm = 200 km (tropopause at 156 km at the equator, 150 km at the poles); with 550 km it
+    // would be at 1e-11 bar. The start-up line prints what came out.
+    static int t_init_anchor(){
+        static const int v = [](){ const char* e = getenv("ATNEPT_T_INIT_ANCHOR"); return e ? atoi(e) : 1; }();
+        return v;
+    }
+    static double t_1bar_K(){ return 72.0; }    // Voyager 2 radio occultation, Lindal (1992)
+    static double p_bottom_bar(){
+        static const double v = [](){ const char* e = getenv("ATNEPT_P_BOTTOM"); return e ? atof(e) : 31.5; }();
+        return v;
+    }
+    // Bottom temperature [K] of the anchored profile; needs gam (cNeptuneModel.cpp sets it).
+    double t_bottom_anchor_K() const {
+        return t_1bar_K() * std::pow(p_bottom_bar(), gam * R_ref / g);
+    }
 
     // ---- What the SHARED BoundaryConditions.h asks of this model ----
     //
@@ -903,6 +942,11 @@ private:
     double out_minValue() const;
 
     void init_layer_heights(){
+        // Called twice: by the constructor with the compiled L_atm and by Run() with the
+        // config's. Without the clear the second call only APPENDED, so get_layer_height()
+        // and layer_thickness_m() kept the compiled 550 km whatever the config said (found
+        // 2026-10-12 with L_atm = 200; no difference while the config has the compiled value).
+        m_layer_heights.clear();
         float h = L_atm/(im-1);
         for(int i=0; i<im; i++){
             m_layer_heights.push_back(i * h);

@@ -33,11 +33,15 @@ void cNeptuneModel::init_temperature(){
 
             const double T_top    = t_eff * (d_j * d_j/(d_j_half * d_j_half)
                 - 2.0 * d_j/d_j_half) + t_pole;                         // K at i=im-1
-            const double T_bottom = T_top + gam * L_atm;                // K at i=0
+            // ATNEPT_T_INIT_ANCHOR=1: the adiabat through t_1bar_K() at 1 bar, the same at
+            // every latitude, isothermal at T_top above the level where it has cooled to T_top.
+            const bool anchor = t_init_anchor() != 0;
+            const double T_bottom = anchor ? t_bottom_anchor_K() : T_top + gam * L_atm;   // K at i=0
 
             for(int i = 0; i < im; i++){
                 height = get_layer_height(i);                           // km
                 t.x[i][j][k] = (T_bottom - gam * height) / t_ref;
+                if(anchor) t.x[i][j][k] = std::max(T_bottom - gam * height, T_top) / t_ref;
 
 /*
     cout.precision(10);
@@ -131,12 +135,23 @@ void cNeptuneModel::init_PressureStatic(){
 
             const double T_top    = t_eff * (d_j * d_j/(d_j_half * d_j_half)
                 - 2.0 * d_j/d_j_half) + t_pole;                         // K at i=im-1
-            const double T_bottom = T_top + gam * L_atm;                // K at i=0
+            // ATNEPT_T_INIT_ANCHOR=1: as in init_temperature. r_mix has been scaled to the
+            // anchored bottom state by then, so p_bottom below IS p_bottom_bar().
+            const bool anchor = t_init_anchor() != 0;
+            const double T_bottom = anchor ? t_bottom_anchor_K() : T_top + gam * L_atm;   // K at i=0
             const double p_bottom = r_mix * R_mix * T_bottom * 1e-5;    // bar highest static pressure
+            const double h_trop   = (T_bottom - T_top) / gam;           // km, where the adiabat reaches T_top
+            const double p_trop   = p_bottom * pow(T_top / T_bottom, exp_pressure);
 
             for(int i = 0; i < im; i++){
                 double height = get_layer_height(i);                    // km
                 t.x[i][j][k] = (T_bottom - gam * height) / t_ref;
+                if(anchor && height > h_trop){
+                    // isothermal layer: hydrostatic with the same gas constant as the exponent
+                    t.x[i][j][k] = T_top / t_ref;
+                    p_stat.x[i][j][k] = p_trop * exp(-(height - h_trop) * g / (R_ref * T_top));
+                    continue;
+                }
 
                 // The base is the RATIO T(i)/T(0), not T(i)/t_ref. p_bottom is the pressure at
                 // T_bottom, so the exponent must be anchored there too or the whole field is
