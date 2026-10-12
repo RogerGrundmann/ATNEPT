@@ -89,7 +89,43 @@ void cNeptuneModel::init_PressureDynamic(){
     //     radial wind at 224                                -5.42 .. +2.40 -> -0.11 .. +1.15 m/s
     //     H2O / NH3 / H2S column                            -0.83 / -0.42 / -0.30 % -> +0.15 / +0.06 / +0.05 %
     // v, w and the temperature extrema agree within 3 %, the mean OLR is 0.806 W/m2 in both.
-    static const int pdyn_init = [](){ const char* e = getenv("ATNEPT_PDYN_INIT"); return e ? atoi(e) : 0; }();
+    static const int pdyn_init = [](){ const char* e = getenv("ATNEPT_PDYN_INIT"); return e ? atoi(e) : 2; }();
+    // 2 (2026-10-12): p_dyn starts in balance with the metric term of the radial momentum
+    // equation. rhs_u carries + (v2 + w2) / rm, the centrifugal acceleration of the horizontal
+    // flow itself, and the prescribed jet makes it large (w = 400 m/s gives 6.5e-3 m/s2 on
+    // Neptune). With p_dyn = 0 nothing opposes it: it pushes u upward in every column, and
+    // against a rigid lid that is a divergence in the wall cells. The pressure solver would
+    // build the balancing gradient itself (the term is in its source), but one sweep per call
+    // does not get there. So it is integrated here, d p_dyn / dr = (v2 + w2) / (rm * scale_p),
+    // from zero at the bottom, trapezoid in r, with the RHS's own scale_p = 1e5 / (r_mix u_0^2).
+    // DEFAULT SINCE 2026-10-12 on the user's word ("repair ... the raised continuity residuum from
+    // the rigid lid"). MEASURED with a per-term print of rhs_u (not kept): at iteration 16 the term
+    // is the whole of the level-mean tendency of u, everything else 20 times smaller or more; with
+    // 2 the pressure gradient cancels it in the interior, a remainder stays in the first and last
+    // cell. 224 iterations, rigid lid on, 0 against 2 (ATJUP/satchk/giants/NL224, NB224):
+    //     continuity residuum at 16 / 224   0.0046 / 0.0172 -> 0.0011 / 0.0088
+    //     radial wind at 224                0.00 .. +0.86 -> -0.05 .. +0.23 m/s
+    //     H2O / NH3 / H2S column            +0.075 / +0.031 / +0.028 % -> +0.032 / -0.0001 / +0.0008 %
+    // v, w, the temperature extrema, the OLR and the precipitation are unchanged.
+    if(pdyn_init == 2){
+        const double scale_p = 1.0e5 / (r_mix * u_0 * u_0);
+        double pmax = 0.0;
+        #pragma omp parallel for collapse(2) schedule(static) reduction(max:pmax)
+        for(int j = 0; j < jm; j++){
+            for(int k = 0; k < km; k++){
+                double f_prev = 0.0, p_ = 0.0;
+                for(int i = 0; i < im; i++){
+                    const double f = (v.x[i][j][k] * v.x[i][j][k] + w.x[i][j][k] * w.x[i][j][k])
+                                   / (metricRadius(rad.z[i]) * scale_p);
+                    if(i > 0) p_ += 0.5 * (f_prev + f) * dr;
+                    p_dyn.x[i][j][k] = p_; f_prev = f;
+                    if(p_ > pmax) pmax = p_;
+                }
+            }
+        }
+        printf("      ATNEPT: init_PressureDynamic: p_dyn balances the metric term (v2 + w2)/rm of rhs_u; max %.6f bar (ATNEPT_PDYN_INIT=0 starts it at zero)\n", pmax);
+        return;
+    }
     if(pdyn_init == 0){
         for(int i = 0; i < im; i++)
             for(int j = 0; j < jm; j++)
