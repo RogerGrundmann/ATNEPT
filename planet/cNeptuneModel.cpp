@@ -82,8 +82,15 @@ static int press_solver_shared(){
 // not been measured, and a module that feeds back into the condensate fields is not something to
 // switch on by inheritance. It DOES feed back — the condensate it converts is removed from
 // cloud/ice in place — so it must run AFTER the SaturationAdjustment calls or they undo it.
+// DEFAULT 1 SINCE 2026-10-12 on the user's word ("on Uranus exists no rain of any species"; the
+// same on Neptune): the scheme runs, with the rate scale calibrated to the emitted flux
+// (Planet::precip_rate_scale()), the corrected t_00 values of NH3, CH4 and H2S (cNeptuneModel.h)
+// and the coupling to the species and temperature equations (RHS_Nept_Turb.cpp,
+// ATNEPT_PRECIP_COUPLING). The notes above describe the scheme as it stood before that.
+// ATNEPT_PRECIP=0 with ATNEPT_T00_LEGACY=1 and ATNEPT_LV_H2S=3.534e6 is the model before (byte-identical
+// except for the all-zero Precip_* block in the horizontal VTK).
 static int precip_enabled(){
-    static const int v = [](){ const char* e = getenv("ATNEPT_PRECIP"); return e ? atoi(e) : 0; }();
+    static const int v = [](){ const char* e = getenv("ATNEPT_PRECIP"); return e ? atoi(e) : 1; }();
     return v;
 }
 
@@ -438,7 +445,8 @@ void cNeptuneModel::Run(){
         "Precipitation (in place)", "scalar sync, chemistry, forces, radiation", "RungeKutta: reset to the n-level copies",
         "RungeKutta: floor, limiters and remainder", "boundary conditions", "clampNegativeSpecies", "turbulence, convective adjustment, filters" };
     static const char* cw_term[NeptCwb::NTERM] = { "RungeKutta: radial transport   -u dq/dr", "RungeKutta: meridional transport",
-        "RungeKutta: zonal transport", "RungeKutta: diffusion", "RungeKutta: chemistry source", "(reference, not a term) q*div(u)" };
+        "RungeKutta: zonal transport", "RungeKutta: diffusion", "RungeKutta: chemistry source", "RungeKutta: precipitation source",
+        "(reference, not a term) q*div(u)" };
     Array* cw_f[NeptCwb::NGAS][3]  = { { &h2o,  &h2o_cloud,  &h2o_ice  }, { &nh3,  &nh3_cloud,  &nh3_ice  }, { &ch4,  &ch4_cloud,  &ch4_ice  }, { &h2s,  &h2s_cloud,  &h2s_ice  } };
     Array* cw_fn[NeptCwb::NGAS][3] = { { &h2on, &h2o_cloudn, &h2o_icen }, { &nh3n, &nh3_cloudn, &nh3_icen }, { &ch4n, &ch4_cloudn, &ch4_icen }, { &h2sn, &h2s_cloudn, &h2s_icen } };
     double cw_sum[NeptCwb::NGAS][TB_N] = {{0.0}}, cw_tsum[NeptCwb::NGAS][NeptCwb::NTERM] = {{0.0}};
@@ -867,6 +875,13 @@ void cNeptuneModel::resetArrays(){
     precip_srf_h2o.initArray_2D(jm, km, 0.0);
     precip_srf_nh3.initArray_2D(jm, km, 0.0);
     precip_srf_ch4.initArray_2D(jm, km, 0.0);
+    P_h2s_rain.initArray(im, jm, km, 0.0);
+    P_h2s_snow.initArray(im, jm, km, 0.0);
+    P_h2s_graupel.initArray(im, jm, km, 0.0);
+    S_precip_h2s.initArray(im, jm, km, 0.0);
+    S_precip_h2s_cloud.initArray(im, jm, km, 0.0);
+    S_precip_h2s_ice.initArray(im, jm, km, 0.0);
+    precip_srf_h2s.initArray_2D(jm, km, 0.0);
     precip_srf_nh4sh.initArray_2D(jm, km, 0.0);
     precip_srf_total.initArray_2D(jm, km, 0.0);
     tke.initArray(im, jm, km, 0.0);

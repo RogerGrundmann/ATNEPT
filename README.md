@@ -154,7 +154,13 @@ and turbulence remain diagnostic-only here.
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `ATNEPT_PRECIP` | 0 | precipitation scheme; fills `P_*`, `Q_precip`, `S_precip_*` (diagnostic only here) |
+| `ATNEPT_PRECIP` | 1 | since 2026-10-12 (was 0: no rain of any species): precipitation scheme for H2O, NH3, CH4 and H2S; fills `P_*`, `Q_precip`, `S_precip_*`. `0` together with `ATNEPT_T00_LEGACY=1` and `ATNEPT_LV_H2S=3.534e6` is the model before (byte-identical except for the all-zero `Precip_*` block in the horizontal VTK) |
+| `ATNEPT_PRECIP_H2S` | 1 | since 2026-10-12: H2S goes through the same three-category scheme (its cloud and ice had no sink before); `0` switches it off. |
+| `ATNEPT_LV_H2S` | 5.5e5 | since 2026-10-12: latent heat of evaporation of H2S in J/kg, read by the saturation adjustment and the precipitation. It was 3.534e6, larger than `ls_h2s` 7.45e5, so the heat of fusion came out negative; `ATNEPT_LV_H2S=3.534e6` restores |
+| `ATNEPT_PRECIP_SCALE` | 0.000485 | one factor on the five rate coefficients, calibrated 2026-10-12 so that the latent flux of the precipitation of all four species meets the emitted flux of 0.700 W/m² (16 iterations, with `lv_h2s` corrected); 1 = the Jovian set, which put the H2O snow on the flux cap |
+| `ATNEPT_PRECIP_COUPLING` | 1.0 | since 2026-10-12: the precipitation's latent heat enters `rhs_t` and its condensate depletion the species equations, as on ATSAT. `0` is not the state before (the shared header then depletes in place) |
+| `ATNEPT_T00_LEGACY` | unset | since 2026-10-12 `t_00` of NH3 / CH4 / H2S is 140 / 67.36 / 140 K (ATSAT's values); they stood above the triple points (220 / 190.56 / 220 K), so that ice could never become snow. `1` restores the old three; the saturation adjustment reads `t_00` too |
+| `ATNEPT_PRECIP_DIAG=1` | off | print-only: per species the mean column-max precipitation flux, its latent flux against the emitted flux, and the cells on the flux cap |
 | `ATNEPT_TURB` | unset | the closure runs whenever `turb_model` is not `none` (default since 2026-10-11); `ATNEPT_TURB=0` switches it off |
 | `ATNEPT_TURB_MODEL` | *param* | override `turb_model` (`k_epsilon`, `k_omega`, `k_omega_SST`) |
 | `ATNEPT_TURB_COUPLING` | 0.0 | feed the eddy viscosity into momentum, heat and species diffusion |
