@@ -166,6 +166,7 @@ and turbulence remain diagnostic-only here.
 
 | Variable | Default | Effect |
 |----------|---------|--------|
+| `ATNEPT_PDYN_INIT` | 0 | since 2026-10-12: the dynamic pressure starts at zero (1 = before: the kinetic energy density of the prescribed wind, up to 1.53 bar, whose radial gradient drove a radial wind; 224 iterations, 1 against 0: continuity residuum 0.052 → 0.006, u −5.4..+2.4 → −0.1..+1.2 m/s, H2O column −0.83 % → +0.15 %) |
 | `ATNEPT_T_INIT_ANCHOR` | 1 | since 2026-10-12: the initial profile is ONE adiabat through 72 K at 1 bar from `ATNEPT_P_BOTTOM` (31.5 bar, 254.8 K) upwards, isothermal at `t_equator`..`t_pole` above the level where it reaches them; the reference densities are scaled by one factor (3.01) to that bottom state. The config defaults went with it: `L_atm` 550 → 200 km, `tropopause_pole` 250 → 150, `tropopause_equator` 200 → 156. `0` **together with those three old values** restores the profile before (724 K at 31.5 bar: the same adiabat anchored at 0.058 bar) |
 | `ATNEPT_THERMAL_MASSFLUX` | 0.0 since 2026-10-11 (was 1.0) | scale the diffusive-enthalpy sink in `rhs_t` — see *Known limitations* |
 | `ATNEPT_DAMP_T_VERT` | 0.0 | since 2026-10-11 (was 1.0, without a knob): strength of the vertical pass of the Shapiro filter on `t`; the horizontal passes are untouched |

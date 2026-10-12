@@ -76,6 +76,28 @@ void cNeptuneModel::init_PressureDynamic(){
 
     auto begin = std::chrono::high_resolution_clock::now();
 
+    // ATNEPT_PDYN_INIT (2026-10-12): what the dynamic pressure starts from. 1 is the kinetic energy
+    // density of the prescribed wind, which this routine has always written; 0 starts it at zero
+    // and leaves it to the pressure solver -- ATSAT's repair of the same day (ATSAT_PDYN_INIT,
+    // InitVariables_Sat.cpp has the derivation): p_dyn enters the momentum equations through its
+    // gradient, and the radial gradient of that kinetic-energy field is a force nothing balances.
+    // ATJUP has always started p_dyn at zero.
+    // DEFAULT 0 SINCE 2026-10-12 on the user's word (1 restores, byte-identical to a0eab28).
+    // On Neptune the field peaked at 1.53 bar at the equator (r_mix 5.05 kg/m3, w up to 420 m/s).
+    // MEASURED, 224 iterations, 4 threads, 1 against 0 (ATJUP/satchk/giants/NP1, NP0):
+    //     continuity residuum at iteration 16 / 112 / 224   0.148 / 0.068 / 0.052 -> 0.007 / 0.005 / 0.006
+    //     radial wind at 224                                -5.42 .. +2.40 -> -0.11 .. +1.15 m/s
+    //     H2O / NH3 / H2S column                            -0.83 / -0.42 / -0.30 % -> +0.15 / +0.06 / +0.05 %
+    // v, w and the temperature extrema agree within 3 %, the mean OLR is 0.806 W/m2 in both.
+    static const int pdyn_init = [](){ const char* e = getenv("ATNEPT_PDYN_INIT"); return e ? atoi(e) : 0; }();
+    if(pdyn_init == 0){
+        for(int i = 0; i < im; i++)
+            for(int j = 0; j < jm; j++)
+                for(int k = 0; k < km; k++) p_dyn.x[i][j][k] = 0.0;
+        cout << "      ATNEPT: init_PressureDynamic: p_dyn starts at zero (ATNEPT_PDYN_INIT=1 restores the kinetic-energy field)" << endl;
+        return;
+    }
+
     for(int k = 0; k < km; k++){
         for(int j = 0; j < jm; j++){
             for(int i = 0; i < im; i++){
