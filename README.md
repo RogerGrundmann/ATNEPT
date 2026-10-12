@@ -172,6 +172,7 @@ and turbulence remain diagnostic-only here.
 | `ATNEPT_DAMP_T_VERT` | 0.0 | since 2026-10-11 (was 1.0, without a knob): strength of the vertical pass of the Shapiro filter on `t`; the horizontal passes are untouched |
 | `ATNEPT_RK_SCALAR_SYNC` | 2 | since 2026-10-11: the Runge-Kutta step starts from the state the saturation adjustment left (2 = condensate and temperature, 1 = condensate only, 0 = before: both discarded every step) |
 | `ATNEPT_TB_DIAG=<n>` | off | print-only: every n iterations, which stage of the loop and which term of `rhs_t` changed the level-mean temperature (`planet/TbNept.h`) |
+| `ATNEPT_CWB_DIAG=<n>` | off | print-only: every n iterations, which stage of the loop and which term of the species equations changed the H2O, NH3, CH4 and H2S columns (vapour + cloud + ice), in g/m², with `q·div(u)` as a reference (`planet/CwbNept.h`, ported from `ATSAT_CWB_DIAG`) |
 | `ATNEPT_SINTHE_MIN` | 0.0 | env floor on sin θ — **not the value in force**: the integrator uses a hardcoded `sinthe_min = 0.4`, so this accessor is not consulted by default |
 | `ATNEPT_PRESS_SOLVER` | *see code* | pressure-solver selection |
 | `ATNEPT_STEADY` | 1 | steady-state query in the report |

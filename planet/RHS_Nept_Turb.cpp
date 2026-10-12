@@ -6,6 +6,7 @@
 
 #include "cNeptuneModel.h"
 #include "TbNept.h"
+#include "CwbNept.h"        // ATNEPT_CWB_DIAG, print-only
 
 using namespace std;
 
@@ -628,6 +629,49 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
     const double v_stokes_nh4sh =
         (2.0 / 9.0) * r_p_nh4sh * r_p_nh4sh
         * (rho_cond_nh4sh - rho_mix.x[i][j][k]) * g / mue_mix;
+
+    // ATNEPT_CWB_DIAG (print-only, see CwbNept.h): RK4-weighted column sums of each term of the
+    // three equations of H2O, NH3, CH4 and H2S, per thread. Nothing here is read by the model.
+    if(NeptCwb::st().on){
+        const double dz_cwb = layer_thickness_m(i);
+        if(dz_cwb > 0.0){
+            const double cw = NeptCwb::st().stage_wgt * std::sin(the.z[j]) * dz_cwb;
+            #ifdef _OPENMP
+                const int th_ = omp_get_thread_num();
+            #else
+                const int th_ = 0;
+            #endif
+            double (*a_)[8] = NeptCwb::st().acc[th_];
+            const double div_u = dudr + 2.0 * u_ijk * inv_rm + dvdthe * inv_rm + v_ijk * cotanthe * inv_rm + dwdphi * inv_rmsinthe;
+            double* a;
+            a = a_[NeptCwb::G_H2O];
+            a[NeptCwb::T_RAD]  -= cw * u_ijk   * (dh2odr   + dh2ocdr   + dh2oidr);
+            a[NeptCwb::T_THE]  -= cw * v_invrm * (dh2odthe + dh2ocdthe + dh2oidthe);
+            a[NeptCwb::T_PHI]  -= cw * w_invrs * (dh2odphi + dh2ocdphi + dh2oidphi);
+            a[NeptCwb::T_DIFF] += cw * (1.0 / (sc_h2o * re) + nue_t_s) * (diffusion_h2o + diffusion_h2o_cloud + diffusion_h2o_ice);
+            a[NeptCwb::T_QDIV] += cw * (h2o.x[i][j][k] + h2o_cloud.x[i][j][k] + h2o_ice.x[i][j][k]) * div_u;
+            a = a_[NeptCwb::G_NH3];
+            a[NeptCwb::T_RAD]  -= cw * u_ijk   * (dnh3dr   + dnh3cdr   + dnh3idr);
+            a[NeptCwb::T_THE]  -= cw * v_invrm * (dnh3dthe + dnh3cdthe + dnh3idthe);
+            a[NeptCwb::T_PHI]  -= cw * w_invrs * (dnh3dphi + dnh3cdphi + dnh3idphi);
+            a[NeptCwb::T_DIFF] += cw * (1.0 / (sc_nh3 * re) + nue_t_s) * (diffusion_nh3 + diffusion_nh3_cloud + diffusion_nh3_ice);
+            a[NeptCwb::T_CHEM] += cw * chemical_reaction * massflux_nh3.x[i][j][k];
+            a[NeptCwb::T_QDIV] += cw * (nh3.x[i][j][k] + nh3_cloud.x[i][j][k] + nh3_ice.x[i][j][k]) * div_u;
+            a = a_[NeptCwb::G_CH4];
+            a[NeptCwb::T_RAD]  -= cw * u_ijk   * (dch4dr   + dch4cdr   + dch4idr);
+            a[NeptCwb::T_THE]  -= cw * v_invrm * (dch4dthe + dch4cdthe + dch4idthe);
+            a[NeptCwb::T_PHI]  -= cw * w_invrs * (dch4dphi + dch4cdphi + dch4idphi);
+            a[NeptCwb::T_DIFF] += cw * (1.0 / (sc_ch4 * re) + nue_t_s) * (diffusion_ch4 + diffusion_ch4_cloud + diffusion_ch4_ice);
+            a[NeptCwb::T_QDIV] += cw * (ch4.x[i][j][k] + ch4_cloud.x[i][j][k] + ch4_ice.x[i][j][k]) * div_u;
+            a = a_[NeptCwb::G_H2S];
+            a[NeptCwb::T_RAD]  -= cw * u_ijk   * (dh2sdr   + dh2scdr   + dh2sidr);
+            a[NeptCwb::T_THE]  -= cw * v_invrm * (dh2sdthe + dh2scdthe + dh2sidthe);
+            a[NeptCwb::T_PHI]  -= cw * w_invrs * (dh2sdphi + dh2scdphi + dh2sidphi);
+            a[NeptCwb::T_DIFF] += cw * (1.0 / (sc_h2s * re) + nue_t_s) * (diffusion_h2s + diffusion_h2s_cloud + diffusion_h2s_ice);
+            a[NeptCwb::T_CHEM] += cw * chemical_reaction * massflux_h2s.x[i][j][k];
+            a[NeptCwb::T_QDIV] += cw * (h2s.x[i][j][k] + h2s_cloud.x[i][j][k] + h2s_ice.x[i][j][k]) * div_u;
+        }
+    }
 
     rhs_nh4sh.x[i][j][k] =
         - transport_nh4sh
