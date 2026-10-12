@@ -150,7 +150,7 @@ public:
         // Pass 1: compute jT_* and j_* (ordinary + thermal diffusion fluxes).
         // All writes go to jT_* and j_* at [i][j][k]; reads are from
         // neighbouring cells of t, h2s, nh3, nh4sh — no write-write races.
-        constexpr double sinthe_min = 0.4;
+        static const double sinthe_min = [](){ const char* e = getenv("ATNEPT_SINTHE_FLOOR"); return e ? atof(e) : 0.4; }();   // ATNEPT_SINTHE_FLOOR (2026-10-12): the hardcoded polar metric floor as a knob, default 0.4 = unchanged
 
         #pragma omp parallel for collapse(3) schedule(static)
         for(int k = 1; k < km-1; k++){

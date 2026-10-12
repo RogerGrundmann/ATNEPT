@@ -106,7 +106,7 @@ void cNeptuneModel::RungeKuttaNept(){
 
     // Precompute sin/cos tables — depend only on j.
     // sinthe is clamped to a minimum to prevent 1/sin²θ blow-up near the poles.
-    constexpr double sinthe_min = 0.4;
+    static const double sinthe_min = [](){ const char* e = getenv("ATNEPT_SINTHE_FLOOR"); return e ? atof(e) : 0.4; }();   // ATNEPT_SINTHE_FLOOR (2026-10-12): the hardcoded polar metric floor as a knob, default 0.4 = unchanged
     std::vector<double> sinthe_tbl(jm), costhe_tbl(jm);
     for(int j = 0; j < jm; j++){
         sinthe_tbl[j] = std::max(sinthe_min, std::abs(sin(the.z[j])));
