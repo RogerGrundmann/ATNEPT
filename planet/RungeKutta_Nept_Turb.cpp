@@ -91,9 +91,17 @@ void cNeptuneModel::computeHydrostaticPressure(){
             // ratio. The buoyancy keeps its own switch (ATNEPT_HYDRO_SPLIT) and is not added
             // here: on this model it is ~1e5 too small to matter either way.
             if(metric_split()){
+                // ATNEPT_CORIOLIS_SPLIT: plus the radial Coriolis force as rhs_u forms it,
+                // -Coriolis * (L_atm/u_0) * (-2 omega sin(theta) w) -- with the TRUE sine (the
+                // model's sinthe_min() is 0 by default), not the metric floor 0.4 the RHS's table
+                // carries: a metric floor has no business in a body force, and since the term
+                // leaves rhs_u altogether nothing has to match it there.
+                const double cor_ = coriolis_split()
+                    ? Coriolis * (L_atm / u_0) * 2.0 * omega
+                      * std::max(sinthe_min(), std::abs(sin(the.z[j]))) : 0.0;
                 auto met = [&](int i)->double{
                     return (v.x[i][j][k] * v.x[i][j][k] + w.x[i][j][k] * w.x[i][j][k])
-                         / metricRadius(rad.z[i]); };
+                         / metricRadius(rad.z[i]) + cor_ * w.x[i][j][k]; };
                 p_hydro.x[0][j][k] = 0.0;
                 for(int i = 1; i < im; i++)
                     p_hydro.x[i][j][k] = p_hydro.x[i-1][j][k] + 0.5 * (met(i-1) + met(i)) * dr;

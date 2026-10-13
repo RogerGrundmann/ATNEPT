@@ -1248,6 +1248,13 @@ private:
     static bool metric_split(){
         static const bool v = [](){ const char* e = getenv("ATNEPT_METRIC_SPLIT"); return e ? atoi(e) != 0 : true; }();
         return v; }
+    // ATNEPT_CORIOLIS_SPLIT (2026-10-13; DEFAULT 1 on the user's word, 0 restores; acts only with
+    // ATNEPT_METRIC_SPLIT): the radial Coriolis term of rhs_u joins the metric term in p_hydro. It
+    // is a radial body force like the other, and with the metric term gone it was the one thing
+    // left driving u (ATNEPT_UB_DIAG, equatorial band: -0.014 m/s in 224 iterations at every level).
+    static bool coriolis_split(){
+        static const bool v = [](){ const char* e = getenv("ATNEPT_CORIOLIS_SPLIT"); return e ? atoi(e) != 0 : true; }();
+        return v && metric_split(); }
     void computeBuoyancyRefLevel();
     void computeHydrostaticPressure();                // static pressure
 

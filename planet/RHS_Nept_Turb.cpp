@@ -265,6 +265,7 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
 
     // ATNEPT_METRIC_SPLIT=1: the metric term leaves rhs_u, p_hydro balances it (RungeKutta_Nept_Turb.cpp)
     const double metric_on = metric_split() ? 0.0 : 1.0;
+    const double cor_rad_on = coriolis_split() ? 0.0 : 1.0;
     double transport_u = u_ijk * dudr + v_invrm * dudthe + w_invrs * dudphi
         - metric_on * (v_ijk * v_ijk + w_ijk * w_ijk) * inv_rm;
     double transport_v = u_ijk * dvdr + v_invrm * dvdthe + w_invrs * dvdphi
@@ -583,7 +584,7 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
         + buoyancy_u                                          // see the hydrostatic-split note above
         - transport_u
         + diffusion_u / re_eff + diffusion_u * nue_t
-        - Coriolis    * scale_Cor * Coriolis_rad
+        - cor_rad_on * Coriolis * scale_Cor * Coriolis_rad     // ATNEPT_CORIOLIS_SPLIT: 0 when p_hydro carries it
         // PLUS: the force points away from the axis. See the block where it is formed.
         + (cent_legacy ? -1.0 : +1.0) * centrifugal * scale_cen * centrifugal_rad
         - sponge * u_ijk;
@@ -602,7 +603,7 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
             + metric_on * (v_ijk * v_ijk + w_ijk * w_ijk) * inv_rm,
             - (u_ijk * dudr + v_invrm * dudthe + w_invrs * dudphi),
             + diffusion_u / re_eff + diffusion_u * nue_t,
-            - Coriolis * scale_Cor * Coriolis_rad,
+            - cor_rad_on * Coriolis * scale_Cor * Coriolis_rad,
             + (cent_legacy ? -1.0 : +1.0) * centrifugal * scale_cen * centrifugal_rad,
             + buoyancy_u,
             - sponge * u_ijk };
