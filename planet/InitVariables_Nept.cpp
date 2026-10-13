@@ -90,6 +90,15 @@ void cNeptuneModel::init_PressureDynamic(){
     //     H2O / NH3 / H2S column                            -0.83 / -0.42 / -0.30 % -> +0.15 / +0.06 / +0.05 %
     // v, w and the temperature extrema agree within 3 %, the mean OLR is 0.806 W/m2 in both.
     static const int pdyn_init = [](){ const char* e = getenv("ATNEPT_PDYN_INIT"); return e ? atoi(e) : 2; }();
+    // With ATNEPT_METRIC_SPLIT the metric term is balanced by p_hydro, so a p_dyn that balances it
+    // too would be an unopposed force: it starts at zero then.
+    if(metric_split() && pdyn_init == 2){
+        for(int i = 0; i < im; i++)
+            for(int j = 0; j < jm; j++)
+                for(int k = 0; k < km; k++) p_dyn.x[i][j][k] = 0.0;
+        cout << "      ATNEPT: init_PressureDynamic: p_dyn starts at zero, the metric term is carried by p_hydro (ATNEPT_METRIC_SPLIT=0 restores the balanced p_dyn)" << endl;
+        return;
+    }
     // 2 (2026-10-12): p_dyn starts in balance with the metric term of the radial momentum
     // equation. rhs_u carries + (v2 + w2) / rm, the centrifugal acceleration of the horizontal
     // flow itself, and the prescribed jet makes it large (w = 400 m/s gives 6.5e-3 m/s2 on

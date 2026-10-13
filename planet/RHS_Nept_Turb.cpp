@@ -7,6 +7,7 @@
 #include "cNeptuneModel.h"
 #include "TbNept.h"
 #include "CwbNept.h"        // ATNEPT_CWB_DIAG, print-only
+#include "UbNept.h"         // ATNEPT_UB_DIAG, print-only
 
 using namespace std;
 
@@ -262,8 +263,10 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
 
     double transport_t = u_ijk * dtdr + v_invrm * dtdthe + w_invrs * dtdphi;
 
+    // ATNEPT_METRIC_SPLIT=1: the metric term leaves rhs_u, p_hydro balances it (RungeKutta_Nept_Turb.cpp)
+    const double metric_on = metric_split() ? 0.0 : 1.0;
     double transport_u = u_ijk * dudr + v_invrm * dudthe + w_invrs * dudphi
-        - (v_ijk * v_ijk + w_ijk * w_ijk) * inv_rm;
+        - metric_on * (v_ijk * v_ijk + w_ijk * w_ijk) * inv_rm;
     double transport_v = u_ijk * dvdr + v_invrm * dvdthe + w_invrs * dvdphi
         + (u_ijk * v_ijk - w_ijk * w_ijk * cotanthe) * inv_rm;
     double transport_w = u_ijk * dwdr + v_invrm * dwdthe + w_invrs * dwdphi
@@ -570,7 +573,7 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
                    * (buoy_ref_on != 0 ? (b_raw - buoy_ref_level[i]) : b_raw);
     }
     double dphdthe_term = 0.0, dphdphi_term = 0.0;
-    if(hydro_split != 0){
+    if(hydro_split != 0 || metric_split()){
         dphdthe_term = (p_hydro.x[i][j+1][k] - p_hydro.x[i][j-1][k]) * inv_2dthe * inv_rm;
         dphdphi_term = (p_hydro.x[i][j][ke] - p_hydro.x[i][j][kw]) * inv_2dphi * inv_rmsinthe;
     }
@@ -584,6 +587,31 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
         // PLUS: the force points away from the axis. See the block where it is formed.
         + (cent_legacy ? -1.0 : +1.0) * centrifugal * scale_cen * centrifugal_rad
         - sponge * u_ijk;
+
+    // ATNEPT_UB_DIAG (print-only, see UbNept.h): RK4-weighted level sums of each term of rhs_u, per
+    // thread, for the whole level and for the equatorial band. Nothing here is read by the model.
+    if(NeptUb::st().on && i < NeptUb::MAXLEV){
+        const double cw = NeptUb::st().stage_wgt * std::sin(the.z[j]);
+        #ifdef _OPENMP
+            const int th_ = omp_get_thread_num();
+        #else
+            const int th_ = 0;
+        #endif
+        const double tm_[NeptUb::NTERM] = {
+            - dpdr_term,
+            + metric_on * (v_ijk * v_ijk + w_ijk * w_ijk) * inv_rm,
+            - (u_ijk * dudr + v_invrm * dudthe + w_invrs * dudphi),
+            + diffusion_u / re_eff + diffusion_u * nue_t,
+            - Coriolis * scale_Cor * Coriolis_rad,
+            + (cent_legacy ? -1.0 : +1.0) * centrifugal * scale_cen * centrifugal_rad,
+            + buoyancy_u,
+            - sponge * u_ijk };
+        const bool eq_ = (j >= NeptUb::st().j_lo && j <= NeptUb::st().j_hi);
+        for(int q_ = 0; q_ < NeptUb::NTERM; q_++){
+            NeptUb::st().acc[th_][NeptUb::R_ALL][q_][i] += cw * tm_[q_];
+            if(eq_) NeptUb::st().acc[th_][NeptUb::R_EQ][q_][i] += cw * tm_[q_];
+        }
+    }
 
     rhs_v.x[i][j][k] =
         - dpdthe_term

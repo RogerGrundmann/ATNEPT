@@ -55,6 +55,9 @@ public:
         const bool phi_per = ATPhys::phi_periodic<cNeptuneModel>();
         const int  k_first = ATPhys::phi_first(phi_per);
 
+        static const bool wall_force = [](){ const char* e = getenv("ATNEPT_PRESS_WALL_FORCE"); return e && atoi(e) != 0; }();
+        const double scale_p = 1.0e5 / (m.r_mix * m.u_0 * m.u_0);     // as rhs_u scales dp/dr
+
         // Boundary conditions for aux — r-direction
         #pragma omp parallel for collapse(2)
         for (int j = 1; j < m.jm-1; j++) {
@@ -156,6 +159,25 @@ public:
         #pragma omp parallel for collapse(2)
         for (int k = 0; k < m.km; k++) {
             for (int j = 0; j < m.jm; j++) {
+                // ATNEPT_PRESS_WALL_FORCE=1 (2026-10-13, default 0): the wall condition a rigid wall
+                // asks of the pressure. With u = 0 on the wall the radial momentum equation there
+                // reads scale_p dp/dr = aux_u, the sum of every other radial force -- on this
+                // planet the metric term (v2 + w2)/r of the jet. The two lines below it set
+                // dp/dr = 0 instead (they are the one-sided second-order form of that), and the
+                // relaxation then carries the flat wall value inwards sweep by sweep.
+                // MEASURED with ATNEPT_UB_DIAG, 224 iterations, equatorial band
+                // (ATJUP/satchk/giants/NUB224): -dp/dr starts at 5.21 / 5.51 / 3.09 e-3 m/s per
+                // iteration at levels 1 / 20 / 39, in balance with the metric term to three digits,
+                // and is 0.39 / 2.73 / 0.19 at the end, the solver having taken 3.77 / 1.60 / 5.37
+                // of it away. With 1 the same one-sided form is set to the wall force, taken from
+                // the two cells next to the wall as aux_u itself is.
+                if(wall_force){
+                    const double g0 = (c43 * m.aux_u.x[1][j][k]      - c13 * m.aux_u.x[2][j][k])      / scale_p;
+                    const double g1 = (c43 * m.aux_u.x[m.im-2][j][k] - c13 * m.aux_u.x[m.im-3][j][k]) / scale_p;
+                    m.p_dyn.x[0][j][k]      = c43 * m.p_dyn.x[1][j][k]      - c13 * m.p_dyn.x[2][j][k]      - 2.0 * m.dr * g0 / 3.0;
+                    m.p_dyn.x[m.im-1][j][k] = c43 * m.p_dyn.x[m.im-2][j][k] - c13 * m.p_dyn.x[m.im-3][j][k] + 2.0 * m.dr * g1 / 3.0;
+                    continue;
+                }
                 m.p_dyn.x[0][j][k]      = c43 * m.p_dyn.x[1][j][k]      - c13 * m.p_dyn.x[2][j][k];
                 m.p_dyn.x[m.im-1][j][k] = c43 * m.p_dyn.x[m.im-2][j][k] - c13 * m.p_dyn.x[m.im-3][j][k];
             }

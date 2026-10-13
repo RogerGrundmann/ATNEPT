@@ -1,6 +1,7 @@
 #include "cNeptuneModel.h"
 #include "TbNept.h"
 #include "CwbNept.h"        // ATNEPT_CWB_DIAG, print-only
+#include "UbNept.h"         // ATNEPT_UB_DIAG, print-only
 
 using namespace std;
 
@@ -78,6 +79,26 @@ void cNeptuneModel::computeHydrostaticPressure(){
                 const double f = -nd * buoy_scale_local * buoyancy * b;
                 return std::isfinite(f) ? f : 0.0;
             };
+            // ATNEPT_METRIC_SPLIT=1: the column integral carries the metric term (v2 + w2)/r
+            // INSTEAD, as rhs_u forms it. The pressure solver cannot hold the gradient that
+            // balances a radial body force -- measured here with ATNEPT_UB_DIAG (the balanced
+            // initial p_dyn is 0.39 / 2.73 / 0.19 e-3 m/s per iteration at levels 1 / 20 / 39
+            // after 224 iterations, against a metric term of 3.51 / 3.96 / 4.22), and measured
+            // four ways in ATOM_Precipitation, where neither a line-implicit solve nor a
+            // projection in the loop cured it and the column integral did. With the knob rhs_u
+            // drops the term (it and -dp_hydro/dr cancel by construction), and rhs_v / rhs_w
+            // take the horizontal gradient of p_hydro, which is smaller by the shell's aspect
+            // ratio. The buoyancy keeps its own switch (ATNEPT_HYDRO_SPLIT) and is not added
+            // here: on this model it is ~1e5 too small to matter either way.
+            if(metric_split()){
+                auto met = [&](int i)->double{
+                    return (v.x[i][j][k] * v.x[i][j][k] + w.x[i][j][k] * w.x[i][j][k])
+                         / metricRadius(rad.z[i]); };
+                p_hydro.x[0][j][k] = 0.0;
+                for(int i = 1; i < im; i++)
+                    p_hydro.x[i][j][k] = p_hydro.x[i-1][j][k] + 0.5 * (met(i-1) + met(i)) * dr;
+                continue;
+            }
             if(!ref_top){
                 p_hydro.x[0][j][k] = 0.0;
                 for(int i = 1; i < im; i++)
@@ -162,6 +183,7 @@ void cNeptuneModel::RungeKuttaNept(){
         const double wgt  = (stage == 0 || stage == 3) ? 1.0 : 2.0;
         NeptTb::st().stage_wgt = wgt;                 // ATNEPT_TB_DIAG: weight of the tendencies RHSNept is about to sum
         NeptCwb::st().stage_wgt = wgt;                // ATNEPT_CWB_DIAG: the same weight
+        NeptUb::st().stage_wgt = wgt;                 // ATNEPT_UB_DIAG: the same weight
 
         // ---- pass A: evaluate the right-hand sides ----
         #pragma omp parallel for collapse(2) schedule(static)
