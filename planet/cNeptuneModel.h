@@ -1255,6 +1255,38 @@ private:
     static bool coriolis_split(){
         static const bool v = [](){ const char* e = getenv("ATNEPT_CORIOLIS_SPLIT"); return e ? atoi(e) != 0 : true; }();
         return v && metric_split(); }
+    // ATNEPT_CORIOLIS_FULL (2026-10-13; default follows ATNEPT_GEO_BALANCE): the Coriolis force with its full
+    // nondimensional scale. The momentum equations multiply it by L_atm / u_0 with L_atm in
+    // KILOMETRES (200 / 250 = 0.8); the scale of du*/dt* = (L / u_0^2) a is L in METRES over u_0
+    // (800). MEASURED on ATURAN with ATURAN_VBUDGET (ATJUP/satchk/giants/UR50): under the lid the Coriolis
+    // term is 20-70 times smaller than the pressure and the metric term it should balance. ALONE
+    // it does harm: at full scale the prescribed jets and the temperature field are far from
+    // geostrophic balance (ATURAN, config Coriolis 1000, UR50c: v reaches 7.8 m/s in 224 iterations),
+    // which is why it comes with the balanced start of ATNEPT_GEO_BALANCE.
+    // ATNEPT_GEO_BALANCE (2026-10-13; DEFAULT 1 on the user's word, 0 restores byte-identically): the
+    // geostrophically balanced start, option (A) of the user's choice. It switches on four things,
+    // each of which keeps its own knob:
+    //   ATNEPT_TW_BALANCE 1      barotropic jets: the wind of each column's jet level at every
+    //                            depth, plus the thermal-wind shear of the isothermal top
+    //   ATNEPT_CORIOLIS_FULL 1   the Coriolis force at its full nondimensional scale
+    //   ATNEPT_PDYN_GEO 1        p_dyn starts as the barotropic pressure that balances the
+    //                            Coriolis and metric forces of that wind in the meridional equation
+    //   ATNEPT_PRESS_CONSISTENT 1  the model's own pressure solver takes
+    //                            the pressure scale of the momentum equation (it has the metric radius already), so that this
+    //                            pressure is a solution of its equation and not eroded by it
+    static bool geo_balance(){
+        static const bool v = [](){ const char* e = getenv("ATNEPT_GEO_BALANCE"); return e ? atoi(e) != 0 : true; }();
+        return v; }
+    static bool knob_or_geo(const char* name){ const char* e = getenv(name); return e ? atoi(e) != 0 : geo_balance(); }
+    static bool coriolis_full(){ static const bool v = knob_or_geo("ATNEPT_CORIOLIS_FULL"); return v; }
+    static bool pdyn_geo(){ static const bool v = knob_or_geo("ATNEPT_PDYN_GEO"); return v; }
+    static bool press_consistent(){ static const bool v = knob_or_geo("ATNEPT_PRESS_CONSISTENT"); return v; }
+    std::vector<int> tw_anchor_i;        // [j*km + k] the level balanceThermalWind() anchored each column at
+    double coriolis_scale() const { return (coriolis_full() ? L_atm * 1.0e3 : L_atm) / u_0; }
+    // ATNEPT_TW_BALANCE=<strength> (2026-10-13; default 1 with ATNEPT_GEO_BALANCE, else 0): the zonal wind is rebuilt in
+    // thermal-wind balance with the model's own temperature. Ported from ATOM_Precipitation
+    // (VelocityInitializer.h, balance_thermal_wind). See balanceThermalWind().
+    void balanceThermalWind();
     void computeBuoyancyRefLevel();
     void computeHydrostaticPressure();                // static pressure
 

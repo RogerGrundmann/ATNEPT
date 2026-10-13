@@ -97,7 +97,7 @@ void cNeptuneModel::computeHydrostaticPressure(){
                 // carries: a metric floor has no business in a body force, and since the term
                 // leaves rhs_u altogether nothing has to match it there.
                 const double cor_ = coriolis_split()
-                    ? Coriolis * (L_atm / u_0) * 2.0 * omega
+                    ? Coriolis * coriolis_scale() * 2.0 * omega
                       * std::max(sinthe_min(), std::abs(sin(the.z[j]))) : 0.0;
                 auto met = [&](int i)->double{
                     return (v.x[i][j][k] * v.x[i][j][k] + w.x[i][j][k] * w.x[i][j][k])

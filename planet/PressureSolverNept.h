@@ -58,6 +58,12 @@ public:
         static const bool wall_force = [](){ const char* e = getenv("ATNEPT_PRESS_WALL_FORCE"); return e && atoi(e) != 0; }();
         const double scale_p = 1.0e5 / (m.r_mix * m.u_0 * m.u_0);     // as rhs_u scales dp/dr
 
+        // ATNEPT_PRESS_CONSISTENT (2026-10-13; default follows ATNEPT_GEO_BALANCE, which is on):
+        // rhs_* apply scale_p = 1e5 / (r_mix u_0^2) to grad p_dyn, so the Poisson equation is
+        // scale_p lap p = div(aux); the source below carried no 1 / scale_p (0.954 on this planet,
+        // 5.96 on ATURAN, where its absence let the solver relax a balancing pressure away).
+        const double src_scale = cNeptuneModel::press_consistent() ? (m.r_mix * m.u_0 * m.u_0) / 1.0e5 : 1.0;
+
         // Boundary conditions for aux — r-direction
         #pragma omp parallel for collapse(2)
         for (int j = 1; j < m.jm-1; j++) {
@@ -150,7 +156,7 @@ public:
                         ((m.p_dyn.x[i+1][j][k] + m.p_dyn.x[i-1][j][k]) * num1
                        + (m.p_dyn.x[i][j+1][k] + m.p_dyn.x[i][j-1][k]) * num2
                        + (m.p_dyn.x[i][j][ke] + m.p_dyn.x[i][j][kw]) * num3
-                       - (du_dr + dv_dthe + dw_dphi)) * inv_denom;
+                       - src_scale * (du_dr + dv_dthe + dw_dphi)) * inv_denom;
                 }
             }
         }
