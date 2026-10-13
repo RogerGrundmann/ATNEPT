@@ -12,9 +12,15 @@
  * PressureSolverNept remains the default and does not call this.
  */
 void cNeptuneModel::prepareProjectionBoundaries(bool rigid_lid){
+        // ATNEPT_BC_PHI_PERIODIC (ATPhys.h): with 1 aux_* and rhs_* are computed at the seam
+        // meridian k = 0 by RHSNept like everywhere else, so it takes its radial and polar
+        // planes here and k = km-1 becomes its copy instead of both being reconstructed.
+        const bool phi_per = ATPhys::phi_periodic<cNeptuneModel>();
+        const int  k_first = ATPhys::phi_first(phi_per);
+
         #pragma omp parallel for
         for(int j = 1; j < jm-1; j++){          // r-direction
-            for(int k = 1; k < km-1; k++){
+            for(int k = k_first; k < km-1; k++){
                 if(rigid_lid){
                     aux_u.x[0][j][k]      = 0.0;
                     aux_u.x[im-1][j][k] = 0.0;
@@ -53,7 +59,7 @@ void cNeptuneModel::prepareProjectionBoundaries(bool rigid_lid){
         }
 
         #pragma omp parallel for
-        for(int k = 1; k < km-1; k++){          // theta-direction
+        for(int k = k_first; k < km-1; k++){          // theta-direction
             for(int i = 1; i < im-1; i++){
                 aux_u.x[i][0][k] = aux_u.x[i][3][k]
                     - 3.0 * aux_u.x[i][2][k] + 3.0 * aux_u.x[i][1][k];
@@ -80,6 +86,15 @@ void cNeptuneModel::prepareProjectionBoundaries(bool rigid_lid){
         #pragma omp parallel for
         for(int i = 0; i < im; i++){            // phi-direction
             for(int j = 0; j < jm; j++){
+                if(phi_per){
+                    aux_u.x[i][j][km-1] = aux_u.x[i][j][0];
+                    aux_v.x[i][j][km-1] = aux_v.x[i][j][0];
+                    aux_w.x[i][j][km-1] = aux_w.x[i][j][0];
+                    rhs_u.x[i][j][km-1] = rhs_u.x[i][j][0];
+                    rhs_v.x[i][j][km-1] = rhs_v.x[i][j][0];
+                    rhs_w.x[i][j][km-1] = rhs_w.x[i][j][0];
+                    continue;
+                }
                 aux_u.x[i][j][0] = c43 * aux_u.x[i][j][1] - c13 * aux_u.x[i][j][2];
                 aux_u.x[i][j][km-1] = c43 * aux_u.x[i][j][km-2] - c13 * aux_u.x[i][j][km-3];
                 aux_u.x[i][j][0] = aux_u.x[i][j][km-1] =

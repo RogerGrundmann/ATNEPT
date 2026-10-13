@@ -66,6 +66,8 @@ public:
         auto begin = std::chrono::high_resolution_clock::now();
 
         const int im = m.im, jm = m.jm, km = m.km;
+        // ATNEPT_BC_PHI_PERIODIC (ATPhys.h): with 1 the seam meridian k = 0 is computed like any other.
+        const int k_first = ATPhys::phi_first(ATPhys::phi_periodic<cNeptuneModel>());
 
         // reaction constants are the same for all cells
         const double keq = m.m_nh4sh / (m.m_nh3 * m.m_h2s);
@@ -74,7 +76,7 @@ public:
         const double T_d = 3020.0;
 
         #pragma omp parallel for collapse(3) schedule(static)
-        for(int k = 1; k < km-1; k++){
+        for(int k = k_first; k < km-1; k++){
             for(int j = 1; j < jm-1; j++){
                 for(int i = 1; i < im-1; i++){
                     double t_u = m.t.x[i][j][k] * m.t_ref;              // K
@@ -126,6 +128,8 @@ public:
         auto begin = std::chrono::high_resolution_clock::now();
 
         const int im = m.im, jm = m.jm, km = m.km;
+        // ATNEPT_BC_PHI_PERIODIC (ATPhys.h): with 1 the seam meridian k = 0 is computed like any other.
+        const int k_first = ATPhys::phi_first(ATPhys::phi_periodic<cNeptuneModel>());
 
         // Diffusion coefficients for gas-phase species only.
         // NH4SH is a solid precipitate — no gas-phase diffusion.
@@ -153,7 +157,7 @@ public:
         static const double sinthe_min = [](){ const char* e = getenv("ATNEPT_SINTHE_FLOOR"); return e ? atof(e) : 0.4; }();   // ATNEPT_SINTHE_FLOOR (2026-10-12): the hardcoded polar metric floor as a knob, default 0.4 = unchanged
 
         #pragma omp parallel for collapse(3) schedule(static)
-        for(int k = 1; k < km-1; k++){
+        for(int k = k_first; k < km-1; k++){
             for(int j = 1; j < jm-1; j++){
                 for(int i = 1; i < im-1; i++){
                     // Through the accessor, as the integrator and the pressure solve do — the
@@ -195,10 +199,22 @@ public:
             }
         }
 
+        // With the periodic seam k = km-1 is the copy of k = 0. bcPhi does that for the fields of
+        // its list; whichever of the diffusion fluxes are not on it are copied here.
+        if(ATPhys::phi_periodic<cNeptuneModel>()){
+            #pragma omp parallel for collapse(2) schedule(static)
+            for(int i = 0; i < im; i++){
+                for(int j = 0; j < jm; j++){
+                    m.j_nh4sh.x[i][j][km-1]  = m.j_nh4sh.x[i][j][0];
+                    m.jT_nh4sh.x[i][j][km-1] = m.jT_nh4sh.x[i][j][0];
+                }
+            }
+        }
+
         // Pass 2: compute difflux_* (divergence of j_*) and thermalmassflux.
         // Reads j_* from neighbouring cells — all written by pass 1.
         #pragma omp parallel for collapse(3) schedule(static)
-        for(int k = 1; k < km-1; k++){
+        for(int k = k_first; k < km-1; k++){
             for(int j = 1; j < jm-1; j++){
                 for(int i = 1; i < im-1; i++){
                     // Through the accessor, as the integrator and the pressure solve do — the
@@ -395,11 +411,17 @@ public:
     {
         const double dr = m.dr, dthe = m.dthe, dphi = m.dphi;
 
+        // The phi neighbours: k-1, k+1, k-2, k+2, taken round the ring at the seam when
+        // ATNEPT_BC_PHI_PERIODIC=1 (ATPhys.h).
+        const bool phi_per = ATPhys::phi_periodic<cNeptuneModel>();
+        const int kw  = ATPhys::phi_wrap(phi_per, k-1, m.km), ke  = ATPhys::phi_wrap(phi_per, k+1, m.km);
+        const int kw2 = ATPhys::phi_wrap(phi_per, k-2, m.km), ke2 = ATPhys::phi_wrap(phi_per, k+2, m.km);
+
         m.SeaMount.x[i][j][k] = 0.0;                                    // no SeaMount introduced
 /*
         dcdr =   (c.x[i+1][j][k] - c.x[i-1][j][k])/(2.0 * dr);
         dcdthe = (c.x[i][j+1][k] - c.x[i][j-1][k])/(2.0 * dthe);
-        dcdphi = (c.x[i][j][k+1] - c.x[i][j][k-1])/(2.0 * dphi);
+        dcdphi = (c.x[i][j][ke] - c.x[i][j][kw])/(2.0 * dphi);
 */
 
         // radial gradients
@@ -454,33 +476,33 @@ public:
 
         // east gradients
 
-        if(((m.SeaMount.x[i][j][k] == 1.0)&&(m.SeaMount.x[i][j][k+1] == 0.0))
-            &&(m.SeaMount.x[i][j][k+2] == 0.0)){
-            c.x[i][j][k] = m.c43 * c.x[i][j][k+1] - m.c13 * c.x[i][j][k+2];
-            dcdphi = (- 3.0 * c.x[i][j][k] + 4.0 * c.x[i][j][k+1]
-                - c.x[i][j][k+2])/(2.0 * dphi);
+        if(((m.SeaMount.x[i][j][k] == 1.0)&&(m.SeaMount.x[i][j][ke] == 0.0))
+            &&(m.SeaMount.x[i][j][ke2] == 0.0)){
+            c.x[i][j][k] = m.c43 * c.x[i][j][ke] - m.c13 * c.x[i][j][ke2];
+            dcdphi = (- 3.0 * c.x[i][j][k] + 4.0 * c.x[i][j][ke]
+                - c.x[i][j][ke2])/(2.0 * dphi);
         }
-        if(((m.SeaMount.x[i][j][k-1] == 1.0)&&(m.SeaMount.x[i][j][k] == 0.0))
-            &&(m.SeaMount.x[i][j][k+1] == 0.0)){
-            dcdphi = (c.x[i][j][k+1] - c.x[i][j][k-1])/(2.0 * dphi);
+        if(((m.SeaMount.x[i][j][kw] == 1.0)&&(m.SeaMount.x[i][j][k] == 0.0))
+            &&(m.SeaMount.x[i][j][ke] == 0.0)){
+            dcdphi = (c.x[i][j][ke] - c.x[i][j][kw])/(2.0 * dphi);
         }
 
         // west gradients
 
-        if(((m.SeaMount.x[i][j][k] == 1.0)&&(m.SeaMount.x[i][j][k-1] == 0.0))
-            &&(m.SeaMount.x[i][j][k-2] == 0.0)){
-            c.x[i][j][k] = m.c43 * c.x[i][j][k-1] - m.c13 * c.x[i][j][k-2];
-            dcdphi = (- 3.0 * c.x[i][j][k] + 4.0 * c.x[i][j][k-1]
-                - c.x[i][j][k-2])/(2.0 * dphi);
+        if(((m.SeaMount.x[i][j][k] == 1.0)&&(m.SeaMount.x[i][j][kw] == 0.0))
+            &&(m.SeaMount.x[i][j][kw2] == 0.0)){
+            c.x[i][j][k] = m.c43 * c.x[i][j][kw] - m.c13 * c.x[i][j][kw2];
+            dcdphi = (- 3.0 * c.x[i][j][k] + 4.0 * c.x[i][j][kw]
+                - c.x[i][j][kw2])/(2.0 * dphi);
         }
-        if(((m.SeaMount.x[i][j][k-1] == 1.0)&&(m.SeaMount.x[i][j][k] == 0.0))
-            &&(m.SeaMount.x[i][j][k+1] == 0.0)){
-            dcdphi = (c.x[i][j][k+1] - c.x[i][j][k-1])/(2.0 * dphi);
+        if(((m.SeaMount.x[i][j][kw] == 1.0)&&(m.SeaMount.x[i][j][k] == 0.0))
+            &&(m.SeaMount.x[i][j][ke] == 0.0)){
+            dcdphi = (c.x[i][j][ke] - c.x[i][j][kw])/(2.0 * dphi);
         }
 
-        if(((m.SeaMount.x[i][j][k-1] == 0.0)&&(m.SeaMount.x[i][j][k] == 0.0))
-            &&(m.SeaMount.x[i][j][k+1] == 0.0)){
-            dcdphi = (c.x[i][j][k+1] - c.x[i][j][k-1])/(2.0 * dphi);
+        if(((m.SeaMount.x[i][j][kw] == 0.0)&&(m.SeaMount.x[i][j][k] == 0.0))
+            &&(m.SeaMount.x[i][j][ke] == 0.0)){
+            dcdphi = (c.x[i][j][ke] - c.x[i][j][kw])/(2.0 * dphi);
         }
 
         return;

@@ -239,13 +239,19 @@ void cNeptuneModel::Forces(){
 
     double rm, sinthe, costhe, rmsinthe;
 
+    // ATNEPT_BC_PHI_PERIODIC (ATPhys.h): with 1 the seam meridian k = 0 is computed like any other.
+    const bool phi_per = ATPhys::phi_periodic<cNeptuneModel>();
+    const int  k_first = ATPhys::phi_first(phi_per);
+
     for(int i = 1; i < im-1; i++){
         rm = metricRadius(rad.z[i]);
         for(int j = 1; j < jm-1; j++){
             sinthe = sin(the.z[j]);
             costhe = cos(the.z[j]);
             rmsinthe = rm * sinthe;
-                for(int k = 1; k < km-1; k++){
+                for(int k = k_first; k < km-1; k++){
+                    const int kw = ATPhys::phi_wrap(phi_per, k-1, km);
+                    const int ke = ATPhys::phi_wrap(phi_per, k+1, km);
 
 // influence of the Coriolis force
                     double Coriolis_rad = - 2.0 * omega * sinthe * w.x[i][j][k];
@@ -256,7 +262,7 @@ void cNeptuneModel::Forces(){
 // influence of the centrifugal force
                     double dpdr = (p_dyn.x[i+1][j][k] - p_dyn.x[i-1][j][k])/(2.0 * dr);
                     double dpdthe = (p_dyn.x[i][j+1][k] - p_dyn.x[i][j-1][k])/(2.0 * dthe);
-                    double dpdphi = (p_dyn.x[i][j][k+1] - p_dyn.x[i][j][k-1])/(2.0 * dphi);
+                    double dpdphi = (p_dyn.x[i][j][ke] - p_dyn.x[i][j][kw])/(2.0 * dphi);
 
 // acting forces
                     CoriolisForce.x[i][j][k] = Coriolis * r_mix 
