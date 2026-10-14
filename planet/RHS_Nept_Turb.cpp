@@ -8,6 +8,7 @@
 #include "TbNept.h"
 #include "CwbNept.h"        // ATNEPT_CWB_DIAG, print-only
 #include "UbNept.h"         // ATNEPT_UB_DIAG, print-only
+#include "VbNept.h"         // ATNEPT_VBUDGET, print-only
 
 using namespace std;
 
@@ -621,6 +622,21 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
         + diffusion_v / re_eff + diffusion_v * nue_t
         - Coriolis    * scale_Cor * Coriolis_the
         + (cent_legacy ? -1.0 : +1.0) * centrifugal * scale_cen * centrifugal_the;
+
+    // ATNEPT_VBUDGET (print-only, see VbNept.h): the terms of rhs_v against latitude at one level
+    // and one meridian, stage 0. Signs as they enter the sum above, so they add to T_TOT.
+    if(NeptVb::st().on && NeptVb::st().stage == 0 && i == NeptVb::st().i && k == NeptVb::st().k){
+        std::vector<double>* t_ = NeptVb::st().term;
+        const double met_ = (u_ijk * v_ijk - w_ijk * w_ijk * cotanthe) * inv_rm;
+        t_[NeptVb::T_DP][j]   = - dpdthe_term;
+        t_[NeptVb::T_DPH][j]  = - dphdthe_term;
+        t_[NeptVb::T_ADV][j]  = - (transport_v - met_);
+        t_[NeptVb::T_MET][j]  = - met_;
+        t_[NeptVb::T_DIFF][j] = diffusion_v / re_eff + diffusion_v * nue_t;
+        t_[NeptVb::T_COR][j]  = - Coriolis * scale_Cor * Coriolis_the;
+        t_[NeptVb::T_CEN][j]  = (cent_legacy ? -1.0 : +1.0) * centrifugal * scale_cen * centrifugal_the;
+        t_[NeptVb::T_TOT][j]  = rhs_v.x[i][j][k];
+    }
 
     rhs_w.x[i][j][k] =
         - dpdphi_term

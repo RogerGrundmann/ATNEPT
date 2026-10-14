@@ -179,25 +179,72 @@ void cNeptuneModel::init_PressureDynamic(){
     if(pdyn_geo() && metric_split()){
         const double scale_p = 1.0e5 / (r_mix * u_0 * u_0);
         static const double sin_floor = [](){ const char* e = getenv("ATNEPT_SINTHE_FLOOR"); return e ? atof(e) : 0.4; }();
+        // ATNEPT_PDYN_GEO_EXACT (2026-10-14; default follows ATNEPT_GEO_BALANCE, 0 = the trapezoid): integrate so that the
+        // centred difference rhs_v takes returns the integrand exactly at every integrated row,
+        // p[j+1] = p[j-1] + 2 dthe G[j], seeded with the trapezoid's first step. The trapezoid's
+        // centred difference is the 1-2-1 mean of G, measured 5e-3 off at the steep jet flank
+        // 68-74 N (ATNEPT_VBUDGET, NBR224). Two interleaved chains: a 2-cell mode in p is
+        // invisible to the centred difference that reads it.
+        static const bool geo_exact = [](){ const char* e = getenv("ATNEPT_PDYN_GEO_EXACT"); return e ? atoi(e) != 0 : geo_balance(); }();
+        auto integrate = [&](const std::vector<double>& G, std::vector<double>& P){
+            P[0] = 0.0;
+            for(int j = 1; j < jm; j++)
+                P[j] = (geo_exact && j >= 2) ? P[j-2] + 2.0 * dthe * G[j-1]
+                                             : P[j-1] + 0.5 * (G[j-1] + G[j]) * dthe;
+        };
         double pmax = 0.0, pmin = 0.0;
         #pragma omp parallel for schedule(static) reduction(max:pmax) reduction(min:pmin)
         for(int k = 0; k < km; k++){
-            double g_prev = 0.0, p_ = 0.0;
+            std::vector<double> G(jm, 0.0), P(jm, 0.0);
             for(int j = 0; j < jm; j++){
                 const int ia = ((int)tw_anchor_i.size() == jm * km) ? tw_anchor_i[j * km + k] : im - 1;
                 const double rm = metricRadius(rad.z[ia]);
                 const double sth = std::max(sin_floor, std::abs(sin(the.z[j])));          // the RHS's floored sine
                 const double cth = cos(the.z[j]);
                 const double wa = w.x[ia][j][k];
-                const double G = (j == 0 || j == jm-1 || sth < 1.0e-6) ? 0.0
+                G[j] = (j == 0 || j == jm-1 || sth < 1.0e-6) ? 0.0
                     : (Coriolis * coriolis_scale() * 2.0 * omega * cth * wa * rm + wa * wa * cth / sth) / scale_p;
-                if(j > 0) p_ += 0.5 * (g_prev + G) * dthe;
-                g_prev = G;
-                for(int i = 0; i < im; i++) p_dyn.x[i][j][k] = p_;
-                pmax = std::max(pmax, p_); pmin = std::min(pmin, p_);
+            }
+            integrate(G, P);
+            for(int j = 0; j < jm; j++){
+                for(int i = 0; i < im; i++) p_dyn.x[i][j][k] = P[j];
+                pmax = std::max(pmax, P[j]); pmin = std::min(pmin, P[j]);
             }
         }
         printf("      ATNEPT: init_PressureDynamic: p_dyn is the barotropic pressure that balances Coriolis and metric force of the zonal wind in the meridional equation; %.6f .. %.6f bar (ATNEPT_PDYN_GEO=0 starts it at zero)\n", pmin, pmax);
+        // ATNEPT_PDYN_GEO=2: the rest of the balance, level by level (see pdyn_geo_mode()). rhs_v
+        // takes -scale_p dp_dyn/dtheta / rm - dp_hydro/dtheta / rm, so p_baro = Q_i - scale_p p_dyn
+        // - p_hydro(start), where Q_i is the same trapezoid of the same integrand as above with the
+        // wind and the metric radius of level i. Then the start is balanced at every level as
+        // closely as it is at the anchor level (the centred difference of the trapezoid is the
+        // 1-2-1 mean of the integrand, the error left at the steep jet flanks).
+        if(pdyn_geo_mode() == 2){
+            p_baro.assign((size_t)im * jm * km, 0.0);
+            computeHydrostaticPressure();                       // p_baro still zero: the metric / Coriolis integral alone
+            double bmax = 0.0, bmin = 0.0;
+            #pragma omp parallel for schedule(static) reduction(max:bmax) reduction(min:bmin)
+            for(int k = 0; k < km; k++){
+                std::vector<double> G(jm, 0.0), Q(jm, 0.0);
+                for(int i = 0; i < im; i++){
+                    const double rm = metricRadius(rad.z[i]);
+                    for(int j = 0; j < jm; j++){
+                        const double sth = std::max(sin_floor, std::abs(sin(the.z[j])));
+                        const double cth = cos(the.z[j]);
+                        const double wi = w.x[i][j][k];
+                        G[j] = (j == 0 || j == jm-1 || sth < 1.0e-6) ? 0.0
+                            : Coriolis * coriolis_scale() * 2.0 * omega * cth * wi * rm + wi * wi * cth / sth;
+                    }
+                    integrate(G, Q);
+                    for(int j = 0; j < jm; j++){
+                        const double b_ = Q[j] - scale_p * p_dyn.x[i][j][k] - p_hydro.x[i][j][k];
+                        p_baro[((size_t)i * jm + j) * km + k] = b_;
+                        bmax = std::max(bmax, b_); bmin = std::min(bmin, b_);
+                    }
+                }
+            }
+            computeHydrostaticPressure();                       // now with p_baro
+            printf("      ATNEPT: init_PressureDynamic: ATNEPT_PDYN_GEO=2, p_baro (the per-level rest, added to p_hydro, frozen) %.6e .. %.6e\n", bmin, bmax);
+        }
         return;
     }
     // With ATNEPT_METRIC_SPLIT the metric term is balanced by p_hydro, so a p_dyn that balances it

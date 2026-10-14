@@ -1280,6 +1280,17 @@ private:
     static bool knob_or_geo(const char* name){ const char* e = getenv(name); return e ? atoi(e) != 0 : geo_balance(); }
     static bool coriolis_full(){ static const bool v = knob_or_geo("ATNEPT_CORIOLIS_FULL"); return v; }
     static bool pdyn_geo(){ static const bool v = knob_or_geo("ATNEPT_PDYN_GEO"); return v; }
+    // ATNEPT_PDYN_GEO=2 (2026-10-14, DEFAULT with ATNEPT_GEO_BALANCE since then; 1 = the barotropic start alone): the balanced start per LEVEL. p_dyn keeps the
+    // barotropic part (the anchor wind), and p_baro holds what each level's own wind needs on top
+    // of it and of the initial metric / Coriolis integral -- the thermal-wind (baroclinic) pressure
+    // of the vertical shear balanceThermalWind() built. It is added to p_hydro every step, so rhs_v
+    // and rhs_w take its horizontal gradient and rhs_u, which drops the split terms, does not take
+    // its radial one: like the buoyancy of a hydrostatic split it is assumed held by the temperature
+    // field. It is FROZEN at its initial value. See init_PressureDynamic().
+    static int pdyn_geo_mode(){
+        static const int v = [](){ const char* e = getenv("ATNEPT_PDYN_GEO"); return e ? atoi(e) : (geo_balance() ? 2 : 0); }();
+        return v; }
+    std::vector<double> p_baro;          // [(i*jm + j)*km + k], empty unless ATNEPT_PDYN_GEO=2
     static bool press_consistent(){ static const bool v = knob_or_geo("ATNEPT_PRESS_CONSISTENT"); return v; }
     std::vector<int> tw_anchor_i;        // [j*km + k] the level balanceThermalWind() anchored each column at
     double coriolis_scale() const { return (coriolis_full() ? L_atm * 1.0e3 : L_atm) / u_0; }

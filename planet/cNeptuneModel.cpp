@@ -14,6 +14,7 @@
 #include "TbNept.h"
 #include "CwbNept.h"        // ATNEPT_CWB_DIAG, print-only
 #include "UbNept.h"         // ATNEPT_UB_DIAG, print-only
+#include "VbNept.h"         // ATNEPT_VBUDGET, print-only
 #include "ConvectiveAdjustmentNept.h"
 #include "RadiationNept.h"
 #include "TurbulenceNept.h"
@@ -459,6 +460,47 @@ void cNeptuneModel::Run(){
     static const int ub_lat = [](){ const char* e = getenv("ATNEPT_UB_LAT"); return e ? atoi(e) : 0; }();
     NeptUb::st().j_lo = std::max(1,      (jm - 1) / 2 - ub_lat - ub_band);
     NeptUb::st().j_hi = std::min(jm - 2, (jm - 1) / 2 - ub_lat + ub_band);
+    // ATNEPT_VBUDGET=<n> (print-only, see VbNept.h): the terms of rhs_v against latitude at one
+    // level and one meridian, with the five parts of the continuity residuum for the same rows,
+    // printed every n iterations. ATNEPT_VBUDGET_I / _K / _JSTEP choose level, meridian, row step.
+    static const int vb_every = [](){ const char* e = getenv("ATNEPT_VBUDGET"); return e ? atoi(e) : 0; }();
+    static const int vb_jstep = [](){ const char* e = getenv("ATNEPT_VBUDGET_JSTEP"); return e ? std::max(1, atoi(e)) : 10; }();
+    NeptVb::st().on = vb_every > 0;
+    NeptVb::st().i  = [this](){ const char* e = getenv("ATNEPT_VBUDGET_I"); return std::min(im - 2, std::max(1, e ? atoi(e) : 37)); }();
+    NeptVb::st().k  = [this](){ const char* e = getenv("ATNEPT_VBUDGET_K"); return std::min(km - 2, std::max(1, e ? atoi(e) : 180)); }();
+    if(NeptVb::st().on) for(int q_ = 0; q_ < NeptVb::NTERM; q_++) NeptVb::st().term[q_].assign(jm, 0.0);
+    auto vb_print = [&](){
+        const int ib = NeptVb::st().i, kb = NeptVb::st().k;
+        const std::vector<double>* t_ = NeptVb::st().term;
+        printf("\n      ATNEPT_VBUDGET: meridional budget, level i = %d (%.0f km), meridian k = %d, RK stage 0 of the last step,"
+               " nondimensional dv/dt\n", ib, (rad.z[ib] - rad.z[0]) * L_atm, kb);
+        printf("        lat   v[m/s]   u[m/s]      dp_dyn    dp_hydro   advection   metric(uv-w2cot)/r"
+               "   diffusion    Coriolis centrifugal       dv/dt\n");
+        auto row_ = [&](int j){
+            printf("      %5.0f %8.4f %8.5f %11.3e %11.3e %11.3e %11.3e        %11.3e %11.3e %11.3e %11.3e\n",
+                   90.0 - (double)j, v.x[ib][j][kb] * u_0, u.x[ib][j][kb] * u_0,
+                   t_[NeptVb::T_DP][j], t_[NeptVb::T_DPH][j], t_[NeptVb::T_ADV][j], t_[NeptVb::T_MET][j],
+                   t_[NeptVb::T_DIFF][j], t_[NeptVb::T_COR][j], t_[NeptVb::T_CEN][j], t_[NeptVb::T_TOT][j]); };
+        auto pick_ = [&](int j){ return j <= 5 || j >= jm - 6 || j % vb_jstep == 0; };
+        for(int j = 1; j < jm - 1; j++) if(pick_(j)) row_(j);
+        // the continuity residuum as Reporting.h forms it, by part, same rows, same level and meridian
+        printf("      continuity residuum by part (as Reporting.h): du/dr, 2u/r, dv/dthe / r, cot v / r, dw/dphi / (r sin), sum\n");
+        const double rm_ = metricRadius(rad.z[ib]);
+        for(int j = 1; j < jm - 1; j++){
+            if(!pick_(j)) continue;
+            const double sinthe = std::sin(the.z[j]);
+            double costhe = std::cos(the.z[j]);
+            if(costhe_abs() && j > 90) costhe = - costhe;
+            const double p1 = (u.x[ib+1][j][kb] - u.x[ib-1][j][kb]) / (2. * dr);
+            const double p2 = 2. * u.x[ib][j][kb] / rm_;
+            const double p3 = (v.x[ib][j+1][kb] - v.x[ib][j-1][kb]) / (2. * dthe) / rm_;
+            const double p4 = costhe / (rm_ * sinthe) * v.x[ib][j][kb];
+            const double p5 = (w.x[ib][j][kb+1] - w.x[ib][j][kb-1]) / (2. * dphi) / (rm_ * sinthe);
+            printf("      %5.0f %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e\n",
+                   90.0 - (double)j, p1, p2, p3, p4, p5, p1 + p2 + p3 + p4 + p5);
+        }
+    };
+
     enum { UB_RK_RESET = 0, UB_RK_REST, UB_FILTER, UB_BC, UB_N };
     static const char* ub_name[UB_N] = { "RK reset", "RK rest", "filter on u", "BC" };
     static const char* ub_term[NeptUb::NTERM] = { "RK -dp/dr", "RK +(v2+w2)/r", "RK -advection", "RK diffusion",
@@ -595,10 +637,16 @@ void cNeptuneModel::Run(){
             // damp_wiggles applies its axes in the order k, j, i, so the split keeps the order.
             static const double damp_p_vert = [](){
                 const char* e = getenv("ATNEPT_DAMP_P_VERT"); return e ? atof(e) : 1.0; }();
-            if(damp_p_vert == 1.0)
+            // ATNEPT_DAMP_P_HORIZ (2026-10-14; default 0 with ATNEPT_GEO_BALANCE, 1.0 = the filter before): the same for the two
+            // HORIZONTAL passes. Written for the balanced start: p_dyn there holds the meridional
+            // gradient that balances the jets' Coriolis force, and loses half of it in 224 iterations
+            // whether the jets are kept or not (ATNEPT_VEL_SHAPIRO=0).
+            static const double damp_p_horiz = [](){
+                const char* e = getenv("ATNEPT_DAMP_P_HORIZ"); return e ? atof(e) : (geo_balance() ? 0.0 : 1.0); }();
+            if(damp_p_vert == 1.0 && damp_p_horiz == 1.0)
                 AtomUtils::damp_wiggles(p_dyn, nullptr, true, true, true);
             else {
-                AtomUtils::damp_wiggles(p_dyn, nullptr, false, true, true);
+                if(damp_p_horiz != 0.0) AtomUtils::damp_wiggles(p_dyn, nullptr, false, true, true, damp_p_horiz);
                 if(damp_p_vert != 0.0) AtomUtils::damp_wiggles(p_dyn, nullptr, true, false, false, damp_p_vert);
             }
             if(ub_on){
@@ -796,10 +844,26 @@ void cNeptuneModel::Run(){
         AtomUtils::damp_wiggles(t, nullptr, false, true, true);              // horizontal, unchanged
         if(damp_t_vert != 0.0)
             AtomUtils::damp_wiggles(t, nullptr, true, false, false, damp_t_vert);
-        AtomUtils::damp_wiggles(u, nullptr, true, true, true);
+        // ATNEPT_VEL_SHAPIRO=<strength> (2026-10-14; default 0 with ATNEPT_GEO_BALANCE, 1.0 = the pass of every run before):
+        // the strength of the per-iteration Shapiro 1-2-1 pass on u, v, w; 0 drops it. ATJUP runs
+        // no such pass by default (ATJUP_VEL_SHAPIRO_INLOOP 0). Written for the balanced start: the
+        // high-latitude jets lose half their speed in 224 iterations and p_dyn does not follow.
+        static const double vel_shapiro = [](){
+            const char* e = getenv("ATNEPT_VEL_SHAPIRO"); return e ? atof(e) : (geo_balance() ? 0.0 : 1.0); }();
+        // ATNEPT_VEL_SHAPIRO_ORDER=<2|4> (2026-10-14, default 2 = as before): 4 takes ATJUP's
+        // 4th-order pass (response 1 - sin^4 instead of 1 - sin^2): it removes the 2-cell mode as
+        // completely and leaves a jet of 24 rows' wavelength ~0.03 % per pass instead of 1.7 %.
+        static const int vel_order = [](){
+            const char* e = getenv("ATNEPT_VEL_SHAPIRO_ORDER"); return e ? atoi(e) : 2; }();
+        auto vel_filter = [&](Array& f){
+            if(vel_order == 4) AtomUtils::damp_wiggles_ho(f, nullptr, true, true, true, vel_shapiro);
+            else               AtomUtils::damp_wiggles   (f, nullptr, true, true, true, vel_shapiro); };
+        if(vel_shapiro != 0.0) vel_filter(u);
         ub_mark(UB_FILTER);
-        AtomUtils::damp_wiggles(v, nullptr, true, true, true);
-        AtomUtils::damp_wiggles(w, nullptr, true, true, true);
+        if(vel_shapiro != 0.0){
+            vel_filter(v);
+            vel_filter(w);
+        }
 
         BC_Nept(*this).bcRadius();                                      // extrapolation in i-direction along grid boundaries
         BC_Nept(*this).bcTheta();                                       // extrapolation in j-direction along grid boundaries
@@ -910,6 +974,7 @@ void cNeptuneModel::Run(){
         static const int vtk_stride = [](){
             const char* e = getenv("ATNEPT_VTK_STRIDE"); return e ? atoi(e) : 0; }();
         if(iter_n % checkpoint == 0) printMinMax();
+        if(vb_every > 0 && iter_n % vb_every == 0) vb_print();
         if(vtk_stride > 0 ? (iter_n % vtk_stride == 0) : (iter_n % checkpoint == 0)) writeData();
 
         if(panorama_cnt == panorama_print) panorama_cnt = 0;

@@ -2,6 +2,7 @@
 #include "TbNept.h"
 #include "CwbNept.h"        // ATNEPT_CWB_DIAG, print-only
 #include "UbNept.h"         // ATNEPT_UB_DIAG, print-only
+#include "VbNept.h"         // ATNEPT_VBUDGET, print-only
 
 using namespace std;
 
@@ -105,6 +106,9 @@ void cNeptuneModel::computeHydrostaticPressure(){
                 p_hydro.x[0][j][k] = 0.0;
                 for(int i = 1; i < im; i++)
                     p_hydro.x[i][j][k] = p_hydro.x[i-1][j][k] + 0.5 * (met(i-1) + met(i)) * dr;
+                // ATNEPT_PDYN_GEO=2: the frozen baroclinic pressure of the balanced start
+                if(!p_baro.empty())
+                    for(int i = 0; i < im; i++) p_hydro.x[i][j][k] += p_baro[((size_t)i * jm + j) * km + k];
                 continue;
             }
             if(!ref_top){
@@ -192,6 +196,7 @@ void cNeptuneModel::RungeKuttaNept(){
         NeptTb::st().stage_wgt = wgt;                 // ATNEPT_TB_DIAG: weight of the tendencies RHSNept is about to sum
         NeptCwb::st().stage_wgt = wgt;                // ATNEPT_CWB_DIAG: the same weight
         NeptUb::st().stage_wgt = wgt;                 // ATNEPT_UB_DIAG: the same weight
+        NeptVb::st().stage = stage;                   // ATNEPT_VBUDGET: records stage 0 only
 
         // ---- pass A: evaluate the right-hand sides ----
         #pragma omp parallel for collapse(2) schedule(static)
