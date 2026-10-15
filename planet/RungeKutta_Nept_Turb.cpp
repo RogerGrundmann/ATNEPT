@@ -67,7 +67,26 @@ void cNeptuneModel::computeHydrostaticPressure(){
     static const double buoy_scale_local = [](){
         const char* e = getenv("ATNEPT_BUOY_SCALE"); return e ? atof(e) : 1.0; }();
 
-    const double nd = 1.0e5 * L_atm / (u_0 * u_0);
+    // L_atm is in KILOMETRES and the nondimensionalisation needs metres: ATURAN found the same
+    // dropped 1.0e3 in its port and corrected it (ATURAN_HYDRO_ND_KM). The factor acts only where
+    // p_hydro carries the buoyancy (ATNEPT_HYDRO_SPLIT=1, default off), so the default is unchanged.
+    // ATNEPT_HYDRO_ND_KM=1 restores the short factor.
+    static const bool nd_km = [](){
+        const char* e = getenv("ATNEPT_HYDRO_ND_KM"); return e && atoi(e) != 0; }();
+    const double nd = 1.0e5 * (L_atm * (nd_km ? 1.0 : 1.0e3)) / (u_0 * u_0);
+    // ATNEPT_BUOY_RHO_LEVEL=1 (2026-10-15, ported from ATURAN e12e88d; default 0 = as before): the
+    // density anomaly is divided by its LEVEL's mean density, (g L / u_0^2) (rho - rho_level) /
+    // rho_level, ATOM_Precipitation's consistent form, instead of by the constant r_mix. With r_mix
+    // the pressure that follows T fades with the density (ATURAN: ~1/65 near the lid; residuum at
+    // 224 it 0.000116 -> 0.000054 with it). b and buoy_ref_level are both g rho / r_mix in the same
+    // units, so (b - ref) / ref is the relative anomaly. Acts only with ATNEPT_HYDRO_SPLIT=1.
+    static const bool buoy_rho_level = [](){
+        const char* e = getenv("ATNEPT_BUOY_RHO_LEVEL"); return e && atoi(e) != 0; }();
+    const double nd_rel = g * (L_atm * 1.0e3) / (u_0 * u_0);
+    // ATNEPT_HYDRO_SPLIT=1 together with ATNEPT_METRIC_SPLIT (the default): the buoyancy joins the
+    // metric / Coriolis column integral, as on ATURAN (ATURAN_HYDRO_SPLIT, default 1 there).
+    static const bool hs_ = [](){
+        const char* e = getenv("ATNEPT_HYDRO_SPLIT"); return e && atoi(e) != 0; }();
 
     #pragma omp parallel for collapse(2) schedule(static)
     for(int j = 0; j < jm; j++){
@@ -77,7 +96,9 @@ void cNeptuneModel::computeHydrostaticPressure(){
                 if(!(T > 0.0)) return 0.0;
                 const double b = g * p_stat.x[i][j][k] / (r_mix * R_mix * T * t_ref)
                                - buoy_ref_level[i];
-                const double f = -nd * buoy_scale_local * buoyancy * b;
+                const double f = buoy_rho_level
+                    ? -nd_rel * buoy_scale_local * buoyancy * b / buoy_ref_level[i]
+                    : -nd * buoy_scale_local * buoyancy * b;
                 return std::isfinite(f) ? f : 0.0;
             };
             // ATNEPT_METRIC_SPLIT=1: the column integral carries the metric term (v2 + w2)/r
@@ -89,8 +110,8 @@ void cNeptuneModel::computeHydrostaticPressure(){
             // projection in the loop cured it and the column integral did. With the knob rhs_u
             // drops the term (it and -dp_hydro/dr cancel by construction), and rhs_v / rhs_w
             // take the horizontal gradient of p_hydro, which is smaller by the shell's aspect
-            // ratio. The buoyancy keeps its own switch (ATNEPT_HYDRO_SPLIT) and is not added
-            // here: on this model it is ~1e5 too small to matter either way.
+            // ratio. The buoyancy joins the integral only with ATNEPT_HYDRO_SPLIT=1 (default off;
+            // before 2026-10-15 it was never added here, its factor being 1e3 short).
             if(metric_split()){
                 // ATNEPT_CORIOLIS_SPLIT: plus the radial Coriolis force as rhs_u forms it,
                 // -Coriolis * (L_atm/u_0) * (-2 omega sin(theta) w) -- with the TRUE sine (the
@@ -101,7 +122,8 @@ void cNeptuneModel::computeHydrostaticPressure(){
                     ? Coriolis * coriolis_scale() * 2.0 * omega
                       * std::max(sinthe_min(), std::abs(sin(the.z[j]))) : 0.0;
                 auto met = [&](int i)->double{
-                    return (v.x[i][j][k] * v.x[i][j][k] + w.x[i][j][k] * w.x[i][j][k])
+                    return (hs_ ? buoy(i) : 0.0)
+                         + (v.x[i][j][k] * v.x[i][j][k] + w.x[i][j][k] * w.x[i][j][k])
                          / metricRadius(rad.z[i]) + cor_ * w.x[i][j][k]; };
                 p_hydro.x[0][j][k] = 0.0;
                 for(int i = 1; i < im; i++)

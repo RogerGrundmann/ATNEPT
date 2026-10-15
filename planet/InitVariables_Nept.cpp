@@ -220,7 +220,8 @@ void cNeptuneModel::init_PressureDynamic(){
         // 1-2-1 mean of the integrand, the error left at the steep jet flanks).
         if(pdyn_geo_mode() == 2){
             p_baro.assign((size_t)im * jm * km, 0.0);
-            computeHydrostaticPressure();                       // p_baro still zero: the metric / Coriolis integral alone
+            computeBuoyancyRefLevel();                          // the buoyancy's base state, if ATNEPT_HYDRO_SPLIT puts it in p_hydro
+            computeHydrostaticPressure();                       // p_baro still zero: the metric / Coriolis integral (and the buoyancy with ATNEPT_HYDRO_SPLIT)
             double bmax = 0.0, bmin = 0.0;
             #pragma omp parallel for schedule(static) reduction(max:bmax) reduction(min:bmin)
             for(int k = 0; k < km; k++){
