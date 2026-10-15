@@ -137,6 +137,31 @@ inline void cNeptuneModel::clampNegativeReport(){
 inline void BC_Nept::bcRadius(){
     BoundaryConditions<cNeptuneModel>(m).bcRadius();
     m.floorRadialSpecies();
+    // ATNEPT_BC_LID_VW=<form> (2026-10-15, ported from ATURAN 33763ed; DEFAULT 2 WITH ATNEPT_GEO_BALANCE, else 0 = the shared form,
+    // Neumann w[im-1] = 4/3 w[im-2] - 1/3 w[im-3], i.e. dw/dr = 0): the lid value of the TANGENTIAL
+    // velocities v, w only; t, the species and u keep theirs. 2 = linear extrapolation 2 a - b
+    // (zero curvature), 3 = the cubic c - 3 b + 3 a. With dw/dr = 0 a sheared jet at the lid gives
+    // the cell under it a curvature, and the molecular diffusion of w spins the top down against
+    // the frozen p_baro (ATURAN, 79 N, level 39: -0.085 nondimensional at iteration 1). On ATURAN
+    // 2 took the residuum at 224 from 0.000464 to 0.000302 and held the lid jet; 3 the same to 1 %.
+    // HERE (1000 it, 20 threads, with PDYN_GEO_BC; NST1000 -> NGL1000): residuum 0.000428 -> 0.000314,
+    // max |v| 0.270 m/s under the lid (71 N, 200 km) -> 0.167 at 155 km, still growing; jets, T, OLR equal.
+    static const int lid_vw = [](){ const char* e = getenv("ATNEPT_BC_LID_VW"); return e ? atoi(e) : (cNeptuneModel::geo_balance() ? 2 : 0); }();
+    if(lid_vw == 2 || lid_vw == 3){
+        const int a = m.im - 2, b = m.im - 3, c = m.im - 4, l = m.im - 1;
+      #pragma omp parallel for
+        for(int j = 0; j < m.jm; j++){
+            for(int k = 0; k < m.km; k++){
+                if(lid_vw == 2){
+                    m.v.x[l][j][k] = 2.0 * m.v.x[a][j][k] - m.v.x[b][j][k];
+                    m.w.x[l][j][k] = 2.0 * m.w.x[a][j][k] - m.w.x[b][j][k];
+                }else{
+                    m.v.x[l][j][k] = m.v.x[c][j][k] - 3.0 * m.v.x[b][j][k] + 3.0 * m.v.x[a][j][k];
+                    m.w.x[l][j][k] = m.w.x[c][j][k] - 3.0 * m.w.x[b][j][k] + 3.0 * m.w.x[a][j][k];
+                }
+            }
+        }
+    }
 }
 inline void BC_Nept::bcTheta()  { BoundaryConditions<cNeptuneModel>(m).bcTheta();  }
 inline void BC_Nept::bcPhi()    { BoundaryConditions<cNeptuneModel>(m).bcPhi();    }

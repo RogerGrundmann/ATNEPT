@@ -392,6 +392,22 @@ void cNeptuneModel::Run(){
     Forces();
     Latent_Heat();
 
+    // ATNEPT_PDYN_GEO_BC=1 (2026-10-15, ported from ATURAN 33763ed; DEFAULT with ATNEPT_GEO_BALANCE, 0 = the order before):
+    // the three boundary passes also run BEFORE init_PressureDynamic, so that the frozen p_baro of
+    // the balanced start (ATNEPT_PDYN_GEO=2) is built from the fields the first RK stage sees.
+    // Without it bcTheta resets v = w = 0 and the extrapolated scalars at the poles, and bcRadius
+    // the lid and bottom planes, after p_baro is frozen; the p_hydro the RK loop rebuilds then
+    // differs from the one p_baro was balanced against. On ATURAN, whose p_hydro carries the
+    // buoyancy, the row next to the pole started at dv/dt 3.4e-3 (89 N, level 38) and 2.3e-6 with it.
+    // Here p_hydro carries no buoyancy and 224 iterations are unchanged in every printed value
+    // (NGL_bc224 against NIN_v0); default for the same start on both ice giants.
+    static const bool pdyn_geo_bc = [](){ const char* e = getenv("ATNEPT_PDYN_GEO_BC"); return e ? atoi(e) != 0 : geo_balance(); }();
+    if(pdyn_geo_bc){
+        BC_Nept(*this).bcTheta();
+        BC_Nept(*this).bcPhi();
+        BC_Nept(*this).bcRadius();
+    }
+
     init_PressureDynamic();
 
     BC_Nept(*this).bcTheta();
