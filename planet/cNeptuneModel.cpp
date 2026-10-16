@@ -399,7 +399,10 @@ void cNeptuneModel::Run(){
     // first adjustment of the loop (iteration 2) then released latent heat: with ATNEPT_HYDRO_SPLIT=1
     // ATNEPT_BH_DIAG charged it -1.3e-5 (NH3) -4.5e-6 (H2S) -6.9e-6 (CH4) of the buoyancy pressure
     // force at 36 N, level 37 (NSA2), +0.08 K at level 20.
-    static const bool init_satadj_last = [](){ const char* e = getenv("ATNEPT_INIT_SATADJ_LAST"); return e && atoi(e) != 0; }();
+    // DEFAULT 1 WITH ATNEPT_HYDRO_SPLIT=1 since 2026-10-16 on the user's word (0 otherwise, as before).
+    static const bool init_satadj_last = [](){
+        const char* e = getenv("ATNEPT_INIT_SATADJ_LAST"); if(e) return atoi(e) != 0;
+        const char* h = getenv("ATNEPT_HYDRO_SPLIT"); return h && atoi(h) != 0; }();
     if(init_satadj_last){
         SaturationAdjustmentNept(*this).run("H2O",
             coeff_h2o_A, coeff_h2o_B, coeff_h2o_A_i, coeff_h2o_B_i,
@@ -973,8 +976,10 @@ void cNeptuneModel::Run(){
         // the buoyancy and p_baro is frozen: ATNEPT_BH_DIAG (NBH8, level 37) charged the drift of the
         // buoyancy pressure gradient to this pass, secular at 36 N (-2.3e-5 at it 1, -9.5e-5 at 8) and
         // 86-89 N (88 N -6.0e-4 at 8), where the initial T has kinks.
+        // DEFAULT 0 WITH ATNEPT_HYDRO_SPLIT=1 since 2026-10-16 on the user's word (1.0 otherwise, as before).
         static const double damp_t_horiz = [](){
-            const char* e = getenv("ATNEPT_DAMP_T_HORIZ"); return e ? atof(e) : 1.0; }();
+            const char* e = getenv("ATNEPT_DAMP_T_HORIZ"); if(e) return atof(e);
+            const char* h = getenv("ATNEPT_HYDRO_SPLIT"); return (h && atoi(h) != 0) ? 0.0 : 1.0; }();
         if(damp_t_horiz == 1.0)
             AtomUtils::damp_wiggles(t, nullptr, false, true, true);          // horizontal, unchanged
         else if(damp_t_horiz != 0.0)
