@@ -392,6 +392,41 @@ void cNeptuneModel::Run(){
     Forces();
     Latent_Heat();
 
+    // ATNEPT_INIT_SATADJ_LAST=1 (2026-10-16, default 0 = as before): the four saturation adjustments
+    // once more, in the loop's order and with no species filter after them, so that the state
+    // init_PressureDynamic freezes p_baro from is the adjusted one. The adjustments above are each
+    // followed by a Shapiro pass on vapour / cloud / ice, which leaves cells supersaturated, and the
+    // first adjustment of the loop (iteration 2) then released latent heat: with ATNEPT_HYDRO_SPLIT=1
+    // ATNEPT_BH_DIAG charged it -1.3e-5 (NH3) -4.5e-6 (H2S) -6.9e-6 (CH4) of the buoyancy pressure
+    // force at 36 N, level 37 (NSA2), +0.08 K at level 20.
+    static const bool init_satadj_last = [](){ const char* e = getenv("ATNEPT_INIT_SATADJ_LAST"); return e && atoi(e) != 0; }();
+    if(init_satadj_last){
+        SaturationAdjustmentNept(*this).run("H2O",
+            coeff_h2o_A, coeff_h2o_B, coeff_h2o_A_i, coeff_h2o_B_i,
+            t_0_h2o, t_00_h2o,
+            ep_h2o, lv_h2o, ls_h2o, cp_h2o, r_h2o,
+            C_h2o, L0_h2o, R_h2o, del_alf_h2o, del_bet_h2o, m_h2o,
+            h2o, h2o_cloud, h2o_ice);
+        SaturationAdjustmentNept(*this).run("H2S",
+            coeff_h2s_A, coeff_h2s_B, coeff_h2s_A_i, coeff_h2s_B_i,
+            t_0_h2s, t_00_h2s,
+            ep_h2s, lv_h2s, ls_h2s, cp_h2s, r_h2s,
+            C_h2s, L0_h2s, R_h2s, del_alf_h2s, del_bet_h2s, m_h2s,
+            h2s, h2s_cloud, h2s_ice);
+        SaturationAdjustmentNept(*this).run("NH3",
+            coeff_nh3_A, coeff_nh3_B, coeff_nh3_A_i, coeff_nh3_B_i,
+            t_0_nh3, t_00_nh3,
+            ep_nh3, lv_nh3, ls_nh3, cp_nh3, r_nh3,
+            C_nh3, L0_nh3, R_nh3, del_alf_nh3, del_bet_nh3, m_nh3,
+            nh3, nh3_cloud, nh3_ice);
+        SaturationAdjustmentNept(*this).run("CH4",
+            coeff_ch4_A, coeff_ch4_B, coeff_ch4_A_i, coeff_ch4_B_i,
+            t_0_ch4, t_00_ch4,
+            ep_ch4, lv_ch4, ls_ch4, cp_ch4, r_ch4,
+            C_ch4, L0_ch4, R_ch4, del_alf_ch4, del_bet_ch4, m_ch4,
+            ch4, ch4_cloud, ch4_ice);
+    }
+
     // ATNEPT_PDYN_GEO_BC=1 (2026-10-15, ported from ATURAN 33763ed; DEFAULT with ATNEPT_GEO_BALANCE, 0 = the order before):
     // the three boundary passes also run BEFORE init_PressureDynamic, so that the frozen p_baro of
     // the balanced start (ATNEPT_PDYN_GEO=2) is built from the fields the first RK stage sees.
@@ -514,6 +549,78 @@ void cNeptuneModel::Run(){
             const double p5 = (w.x[ib][j][kb+1] - w.x[ib][j][kb-1]) / (2. * dphi) / (rm_ * sinthe);
             printf("      %5.0f %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e\n",
                    90.0 - (double)j, p1, p2, p3, p4, p5, p1 + p2 + p3 + p4 + p5);
+        }
+    };
+
+    // ATNEPT_BH_DIAG=<n> (2026-10-16, print-only): the BUOYANCY part of rhs_v's -dp_hydro/dthe / r
+    // at the ATNEPT_VBUDGET level and meridian, recomputed after every stage of the loop that can
+    // write t, the change charged to that stage, cumulative, printed every n iterations. Written for
+    // ATNEPT_HYDRO_SPLIT=1: the buoyancy integral moves in the first step after p_baro is frozen
+    // (NRH_b2). The column integral, its factor and the level mean are those of
+    // computeHydrostaticPressure(); nothing is written to the model.
+    static const int bh_every = [](){ const char* e = getenv("ATNEPT_BH_DIAG"); return e ? atoi(e) : 0; }();
+    enum { BH_SOLVER = 0, BH_SAT_H2O, BH_SAT_H2S, BH_SAT_NH3, BH_SATADJ, BH_PRECIP, BH_PHYS, BH_RK, BH_TFILT, BH_BC, BH_CLAMP, BH_AFTER, BH_N };
+    static const char* bh_name[BH_N] = { "solver/p filt", "sat.adj H2O", "sat.adj H2S", "sat.adj NH3", "sat.adj CH4", "precip", "chem/latent", "RK step",
+        "t filter", "BC", "clamp", "turb/rad/conv" };
+    const int bh_i = std::min(im - 2, std::max(1, [](){ const char* e = getenv("ATNEPT_VBUDGET_I"); return e ? atoi(e) : 37; }()));
+    const int bh_k = std::min(km - 2, std::max(1, [](){ const char* e = getenv("ATNEPT_VBUDGET_K"); return e ? atoi(e) : 180; }()));
+    std::vector<std::vector<double>> bh_sum(BH_N, std::vector<double>(jm, 0.0));
+    std::vector<double> bh_last(jm, 0.0), bh_first(jm, 0.0);
+    // the buoyancy column integral of meridian bh_k up to level bh_i, every row; minus its
+    // meridional centred difference / r = the buoyancy's share of the T_DPH column of VBUDGET
+    auto bh_term = [&]() -> std::vector<double> {
+        const bool rho_level_ = [](){ const char* e = getenv("ATNEPT_BUOY_RHO_LEVEL"); return e && atoi(e) != 0; }();
+        const bool nd_km_ = [](){ const char* e = getenv("ATNEPT_HYDRO_ND_KM"); return e && atoi(e) != 0; }();
+        const double bscale_ = [](){ const char* e = getenv("ATNEPT_BUOY_SCALE"); return e ? atof(e) : 1.0; }();
+        const double nd_ = 1.0e5 * (L_atm * (nd_km_ ? 1.0 : 1.0e3)) / (u_0 * u_0);
+        const double nd_rel_ = g * (L_atm * 1.0e3) / (u_0 * u_0);
+        std::vector<double> ref_(bh_i + 1, 0.0);
+        #pragma omp parallel for schedule(static)
+        for(int i = 0; i <= bh_i; i++){
+            double s_ = 0.0, w_ = 0.0;
+            for(int j = 0; j < jm; j++){
+                const double wgt = sin(the.z[j]);
+                for(int k = 0; k < km; k++){
+                    if(!(t.x[i][j][k] > 0.0)) continue;
+                    const double b = g * p_stat.x[i][j][k] / (r_mix * R_mix * t.x[i][j][k] * t_ref);
+                    if(!std::isfinite(b)) continue;
+                    s_ += wgt * b; w_ += wgt;
+                }
+            }
+            ref_[i] = w_ > 0.0 ? s_ / w_ : 0.0;
+        }
+        std::vector<double> B_(jm, 0.0), out_(jm, 0.0);
+        for(int j = 0; j < jm; j++){
+            auto bu_ = [&](int i)->double{
+                const double T = t.x[i][j][bh_k];
+                if(!(T > 0.0)) return 0.0;
+                const double b = g * p_stat.x[i][j][bh_k] / (r_mix * R_mix * T * t_ref) - ref_[i];
+                const double f = rho_level_ ? -nd_rel_ * bscale_ * buoyancy * b / ref_[i]
+                                            : -nd_ * bscale_ * buoyancy * b;
+                return std::isfinite(f) ? f : 0.0; };
+            double P_ = 0.0;
+            for(int i = 1; i <= bh_i; i++) P_ += 0.5 * (bu_(i-1) + bu_(i)) * dr;
+            B_[j] = P_;
+        }
+        const double rm_ = metricRadius(rad.z[bh_i]);
+        for(int j = 1; j < jm - 1; j++) out_[j] = - (B_[j+1] - B_[j-1]) / (2.0 * dthe) / rm_;
+        return out_; };
+    auto bh_mark = [&](int stage){
+        if(bh_every <= 0) return;
+        const std::vector<double> w_ = bh_term();
+        for(int j = 0; j < jm; j++){ bh_sum[stage][j] += w_[j] - bh_last[j]; bh_last[j] = w_[j]; } };
+    if(bh_every > 0) bh_last = bh_first = bh_term();
+    auto bh_print = [&](){
+        static const int rows_[] = { 1, 2, 4, 6, 10, 20, 30, 40, 54, 70, 90, 110, 126, 140, 150, 160, 170, 174, 176, 178, 179 };
+        printf("\n      ATNEPT_BH_DIAG: buoyancy part of -dp_hydro/dthe / r at level i = %d, meridian k = %d, nondimensional,"
+               " cumulative change over iterations 1..%d by stage\n        lat       start", bh_i, bh_k, iter_n);
+        for(int s_ = 0; s_ < BH_N; s_++) printf(" %13s", bh_name[s_]);
+        printf("         now\n");
+        for(int r_ : rows_){
+            if(r_ < 1 || r_ > jm - 2) continue;
+            printf("      %5.0f %11.3e", 90.0 - (double)r_, bh_first[r_]);
+            for(int s_ = 0; s_ < BH_N; s_++) printf(" %13.3e", bh_sum[s_][r_]);
+            printf(" %11.3e\n", bh_last[r_]);
         }
     };
 
@@ -672,7 +779,7 @@ void cNeptuneModel::Run(){
                     ub_f_filter[r_][i] += ub_f2[r_][i] - ub_f1[r_][i];
                 }
             }
-            tb_mark(TB_PRE); cwb_mark(TB_PRE);
+            tb_mark(TB_PRE); cwb_mark(TB_PRE); bh_mark(BH_SOLVER);
 
             SaturationAdjustmentNept(*this).run("H2O",
                 coeff_h2o_A, coeff_h2o_B, coeff_h2o_A_i, coeff_h2o_B_i,
@@ -680,6 +787,7 @@ void cNeptuneModel::Run(){
                 ep_h2o, lv_h2o, ls_h2o, cp_h2o, r_h2o,
                 C_h2o, L0_h2o, R_h2o, del_alf_h2o, del_bet_h2o, m_h2o,
                 h2o, h2o_cloud, h2o_ice);
+            bh_mark(BH_SAT_H2O);
 
             SaturationAdjustmentNept(*this).run("H2S",
                 coeff_h2s_A, coeff_h2s_B, coeff_h2s_A_i, coeff_h2s_B_i,
@@ -687,6 +795,7 @@ void cNeptuneModel::Run(){
                 ep_h2s, lv_h2s, ls_h2s, cp_h2s, r_h2s,
                 C_h2s, L0_h2s, R_h2s, del_alf_h2s, del_bet_h2s, m_h2s,
                 h2s, h2s_cloud, h2s_ice);
+            bh_mark(BH_SAT_H2S);
 
             SaturationAdjustmentNept(*this).run("NH3",
                 coeff_nh3_A, coeff_nh3_B, coeff_nh3_A_i, coeff_nh3_B_i,
@@ -694,6 +803,7 @@ void cNeptuneModel::Run(){
                 ep_nh3, lv_nh3, ls_nh3, cp_nh3, r_nh3,
                 C_nh3, L0_nh3, R_nh3, del_alf_nh3, del_bet_nh3, m_nh3,
                 nh3, nh3_cloud, nh3_ice);
+            bh_mark(BH_SAT_NH3);
 
             SaturationAdjustmentNept(*this).run("CH4",
                 coeff_ch4_A, coeff_ch4_B, coeff_ch4_A_i, coeff_ch4_B_i,
@@ -703,9 +813,9 @@ void cNeptuneModel::Run(){
                 ch4, ch4_cloud, ch4_ice);
 
             // Must follow the saturation adjustments: it removes condensate in place.
-            tb_mark(TB_SATADJ); cwb_mark(TB_SATADJ);
+            tb_mark(TB_SATADJ); cwb_mark(TB_SATADJ); bh_mark(BH_SATADJ);
             if(precip_enabled()) PrecipitationNept(*this).run();
-            tb_mark(TB_PRECIP); cwb_mark(TB_PRECIP);
+            tb_mark(TB_PRECIP); cwb_mark(TB_PRECIP); bh_mark(BH_PRECIP);
 
             // ATNEPT_RK_SCALAR_SYNC=<0|1|2> (2026-10-11; DEFAULT 2 on the user's word, 0 restores):
             // ATJUP's repair of 2026-10-08, as ported to ATSAT the same day. RungeKuttaNept
@@ -757,7 +867,7 @@ void cNeptuneModel::Run(){
 
             Forces();
             Latent_Heat();
-            tb_mark(TB_PHYS); cwb_mark(TB_PHYS);
+            tb_mark(TB_PHYS); cwb_mark(TB_PHYS); bh_mark(BH_PHYS);
 
         }  // if loop
 
@@ -783,6 +893,7 @@ void cNeptuneModel::Run(){
         }
 
         RungeKuttaNept();
+        bh_mark(BH_RK);
 
         if(ub_on){
             const ub_tab w_ = ub_lev(u);
@@ -857,9 +968,20 @@ void cNeptuneModel::Run(){
         // mean second difference 3.1 times larger at 0.0 than at 1.0, with nothing oscillating.
         static const double damp_t_vert = [](){
             const char* e = getenv("ATNEPT_DAMP_T_VERT"); return e ? atof(e) : 0.0; }();
-        AtomUtils::damp_wiggles(t, nullptr, false, true, true);              // horizontal, unchanged
+        // ATNEPT_DAMP_T_HORIZ=<strength> (2026-10-16, default 1.0 = the pass of every run before): the
+        // same for the two HORIZONTAL passes. Written for ATNEPT_HYDRO_SPLIT=1, where p_hydro carries
+        // the buoyancy and p_baro is frozen: ATNEPT_BH_DIAG (NBH8, level 37) charged the drift of the
+        // buoyancy pressure gradient to this pass, secular at 36 N (-2.3e-5 at it 1, -9.5e-5 at 8) and
+        // 86-89 N (88 N -6.0e-4 at 8), where the initial T has kinks.
+        static const double damp_t_horiz = [](){
+            const char* e = getenv("ATNEPT_DAMP_T_HORIZ"); return e ? atof(e) : 1.0; }();
+        if(damp_t_horiz == 1.0)
+            AtomUtils::damp_wiggles(t, nullptr, false, true, true);          // horizontal, unchanged
+        else if(damp_t_horiz != 0.0)
+            AtomUtils::damp_wiggles(t, nullptr, false, true, true, damp_t_horiz);
         if(damp_t_vert != 0.0)
             AtomUtils::damp_wiggles(t, nullptr, true, false, false, damp_t_vert);
+        bh_mark(BH_TFILT);
         // ATNEPT_VEL_SHAPIRO=<strength> (2026-10-14; default 0 with ATNEPT_GEO_BALANCE, 1.0 = the pass of every run before):
         // the strength of the per-iteration Shapiro 1-2-1 pass on u, v, w; 0 drops it. ATJUP runs
         // no such pass by default (ATJUP_VEL_SHAPIRO_INLOOP 0). Written for the balanced start: the
@@ -885,9 +1007,9 @@ void cNeptuneModel::Run(){
         BC_Nept(*this).bcTheta();                                       // extrapolation in j-direction along grid boundaries
         BC_Nept(*this).bcPhi();                                         // extrapolation in k-direction along grid boundaries
         ub_mark(UB_BC);
-        tb_mark(TB_BC); cwb_mark(TB_BC);
+        tb_mark(TB_BC); cwb_mark(TB_BC); bh_mark(BH_BC);
         clampNegativeSpecies();                                         // ATNEPT_SPECIES_CLAMP, default on (BC_Nept.h)
-        tb_mark(TB_CLAMP); cwb_mark(TB_CLAMP);
+        tb_mark(TB_CLAMP); cwb_mark(TB_CLAMP); bh_mark(BH_CLAMP);
 
         // How far the run is from a steady state, and WHERE. MUST run BEFORE restoreVar: it
         // differences each field against the n-copy restoreVar is about to overwrite, so after
@@ -908,7 +1030,8 @@ void cNeptuneModel::Run(){
         if(turb_active) TurbulenceNept(*this).run();
         if(radiation_enabled()) RadiationNept(*this).run();
         if(conv_adj_enabled()) ConvectiveAdjustmentNept(*this).run();
-        tb_mark(TB_AFTER); cwb_mark(TB_AFTER);
+        tb_mark(TB_AFTER); cwb_mark(TB_AFTER); bh_mark(BH_AFTER);
+        if(bh_every > 0 && iter_n % bh_every == 0) bh_print();
         if(tb_on && iter_n % tb_every == 0){
             static const int lv_[] = { 0, 1, 2, 3, 5, 8, 12, 16, 20, 24, 28, 32, 35, 37, 38, 39, 40 };
             const int nl_ = (int)(sizeof(lv_) / sizeof(lv_[0]));

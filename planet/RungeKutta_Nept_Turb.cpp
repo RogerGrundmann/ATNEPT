@@ -60,7 +60,7 @@ void cNeptuneModel::computeBuoyancyRefLevel(){
  * through a continuing atmosphere. ATNEPT_HYDRO_REF=1 integrates downward from the top instead so
  * the choice can be measured; it is not the intended configuration.
  */
-void cNeptuneModel::computeHydrostaticPressure(){
+void cNeptuneModel::computeHydrostaticPressure(bool advance_follow){
     static const bool ref_top = [](){
         const char* e = getenv("ATNEPT_HYDRO_REF"); return e && atoi(e) != 0; }();
     // The same factor rhs_u puts on the buoyancy, read the same way, so the two cannot drift apart.
@@ -87,6 +87,14 @@ void cNeptuneModel::computeHydrostaticPressure(){
     // metric / Coriolis column integral, as on ATURAN (ATURAN_HYDRO_SPLIT, default 1 there).
     static const bool hs_ = [](){
         const char* e = getenv("ATNEPT_HYDRO_SPLIT"); return e && atoi(e) != 0; }();
+
+    // ATNEPT_PBARO_FOLLOW (see cNeptuneModel.h): the buoyancy integral is kept apart from the
+    // metric / Coriolis one so that its change since the start can be handed to p_baro.
+    const double follow_tau = pbaro_follow();
+    const bool follow_on = follow_tau > 0.0 && hs_ && metric_split() && !p_baro.empty();
+    const size_t n3_ = (size_t)im * jm * km;
+    const bool follow_capture = follow_on && p_b0.size() != n3_;
+    if(follow_capture){ p_b0.assign(n3_, 0.0); p_bfollow.assign(n3_, 0.0); }
 
     #pragma omp parallel for collapse(2) schedule(static)
     for(int j = 0; j < jm; j++){
@@ -125,6 +133,23 @@ void cNeptuneModel::computeHydrostaticPressure(){
                     return (hs_ ? buoy(i) : 0.0)
                          + (v.x[i][j][k] * v.x[i][j][k] + w.x[i][j][k] * w.x[i][j][k])
                          / metricRadius(rad.z[i]) + cor_ * w.x[i][j][k]; };
+                if(follow_on){
+                    auto met0 = [&](int i)->double{
+                        return (v.x[i][j][k] * v.x[i][j][k] + w.x[i][j][k] * w.x[i][j][k])
+                             / metricRadius(rad.z[i]) + cor_ * w.x[i][j][k]; };
+                    double Pm = 0.0, Pb = 0.0;
+                    for(int i = 0; i < im; i++){
+                        if(i > 0){
+                            Pm += 0.5 * (met0(i-1) + met0(i)) * dr;
+                            Pb += 0.5 * (buoy(i-1) + buoy(i)) * dr;
+                        }
+                        const size_t q = ((size_t)i * jm + j) * km + k;
+                        if(follow_capture) p_b0[q] = Pb;
+                        if(advance_follow) p_bfollow[q] += (Pb - p_b0[q] - p_bfollow[q]) / follow_tau;
+                        p_hydro.x[i][j][k] = Pm + Pb + p_baro[q] - p_bfollow[q];
+                    }
+                    continue;
+                }
                 p_hydro.x[0][j][k] = 0.0;
                 for(int i = 1; i < im; i++)
                     p_hydro.x[i][j][k] = p_hydro.x[i-1][j][k] + 0.5 * (met(i-1) + met(i)) * dr;
@@ -157,7 +182,7 @@ void cNeptuneModel::RungeKuttaNept(){
     // The buoyancy base state and the hydrostatic pressure built from it, refreshed once per RK4
     // step before any stage reads them. Both are inert unless ATNEPT_HYDRO_SPLIT is set.
     computeBuoyancyRefLevel();
-    computeHydrostaticPressure();
+    computeHydrostaticPressure(true);                   // true: one step of ATNEPT_PBARO_FOLLOW, if set
 
     // Precompute sin/cos tables — depend only on j.
     // sinthe is clamped to a minimum to prevent 1/sin²θ blow-up near the poles.

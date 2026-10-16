@@ -1295,6 +1295,20 @@ private:
         static const int v = [](){ const char* e = getenv("ATNEPT_PDYN_GEO"); return e ? atoi(e) : (geo_balance() ? 2 : 0); }();
         return v; }
     std::vector<double> p_baro;          // [(i*jm + j)*km + k], empty unless ATNEPT_PDYN_GEO=2
+    // ATNEPT_PBARO_FOLLOW=<tau> (2026-10-16; DEFAULT 64 on the user's word, 0 = p_baro frozen, the
+    // arithmetic of before): with ATNEPT_HYDRO_SPLIT=1 and ATNEPT_PDYN_GEO=2, p_baro takes up the
+    // change of the buoyancy integral since the start, B(t) - B0, with a time constant of tau RK
+    // steps (1 = exactly, which leaves T without any effect on the winds: the split takes the
+    // buoyancy out of rhs_u). Inert without ATNEPT_HYDRO_SPLIT (default off), so the default run is
+    // unchanged. MEASURED (224 it, on top of DAMP_T_HORIZ 0 + INIT_SATADJ_LAST 1): net dv/dt at
+    // level 37, 36 N, it 64 / 128 / 192: frozen -1.9 / -5.2 / -7.8e-5 (NISA224), tau 64 -1.1 /
+    // -2.48 / -2.52e-5 (NPF64_224), tau 1 = the run without the split to 4 digits (NPF1_224).
+    // See computeHydrostaticPressure().
+    static double pbaro_follow(){
+        static const double v = [](){ const char* e = getenv("ATNEPT_PBARO_FOLLOW"); return e ? atof(e) : 64.0; }();
+        return v; }
+    std::vector<double> p_b0;            // [(i*jm + j)*km + k] the buoyancy integral at the start, with ATNEPT_PBARO_FOLLOW
+    std::vector<double> p_bfollow;       // [(i*jm + j)*km + k] what p_baro has taken up of B(t) - B0 so far
     static bool press_consistent(){ static const bool v = knob_or_geo("ATNEPT_PRESS_CONSISTENT"); return v; }
     std::vector<int> tw_anchor_i;        // [j*km + k] the level balanceThermalWind() anchored each column at
     double coriolis_scale() const { return (coriolis_full() ? L_atm * 1.0e3 : L_atm) / u_0; }
@@ -1303,7 +1317,7 @@ private:
     // (VelocityInitializer.h, balance_thermal_wind). See balanceThermalWind().
     void balanceThermalWind();
     void computeBuoyancyRefLevel();
-    void computeHydrostaticPressure();                // static pressure
+    void computeHydrostaticPressure(bool advance_follow = false);   // static pressure; advance_follow: one step of ATNEPT_PBARO_FOLLOW
 
     Array rhs_t;                // auxilliar field RHS temperature
     Array rhs_u;                // auxilliar field RHS u-velocity component
