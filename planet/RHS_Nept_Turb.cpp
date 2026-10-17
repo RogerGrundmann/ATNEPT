@@ -239,6 +239,18 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
     // meaningful without the other.
     static const bool cent_legacy = [](){
         const char* e = getenv("ATNEPT_CENT_LEGACY"); return e && atoi(e) != 0; }();
+    // ATNEPT_CENTRIFUGAL_MOM (2026-10-17; DEFAULT 0 on the user's word "follow ATOM", 1 restores):
+    // the centrifugal force leaves the momentum equations, as in ATOM_Precipitation, whose
+    // RHS has none (its CentrifugalForce is a diagnostic field only): the centrifugal potential
+    // belongs to the effective gravity. Nothing balanced it here -- the initial pressure leaves
+    // it out, and METRIC_SPLIT / CORIOLIS_SPLIT took the other radial body forces into p_hydro
+    // -- so at the equator its radial part was the only thing driving u: +5e-5 m/s in 224
+    // iterations at every level, and du/dr against the wall u = 0 the largest continuity
+    // residuum in the model's own geometry (ATNEPT NUBW224; with it off, NUBC0_224, u there is
+    // +1e-5 from buoyancy and v, w and the pole residuum are unchanged to three digits). The
+    // diagnostic CentrifugalForce field is untouched. 1 = the config coefficient as before.
+    static const double cent_mom = [](){
+        const char* e = getenv("ATNEPT_CENTRIFUGAL_MOM"); return (e && atoi(e) != 0) ? 1.0 : 0.0; }();
     double centrifugal_rad, centrifugal_the;
     if(cent_legacy){
         centrifugal_rad = omega * omega * rm;
@@ -604,7 +616,7 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
         + diffusion_u / re_eff + diffusion_u * nue_t
         - cor_rad_on * Coriolis * scale_Cor * Coriolis_rad     // ATNEPT_CORIOLIS_SPLIT: 0 when p_hydro carries it
         // PLUS: the force points away from the axis. See the block where it is formed.
-        + (cent_legacy ? -1.0 : +1.0) * centrifugal * scale_cen * centrifugal_rad
+        + (cent_legacy ? -1.0 : +1.0) * centrifugal * cent_mom * scale_cen * centrifugal_rad
         - sponge * u_ijk;
 
     // ATNEPT_UB_DIAG (print-only, see UbNept.h): RK4-weighted level sums of each term of rhs_u, per
@@ -622,7 +634,7 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
             - (u_ijk * dudr + v_invrm * dudthe + w_invrs * dudphi),
             + diffusion_u / re_eff + diffusion_u * nue_t,
             - cor_rad_on * Coriolis * scale_Cor * Coriolis_rad,
-            + (cent_legacy ? -1.0 : +1.0) * centrifugal * scale_cen * centrifugal_rad,
+            + (cent_legacy ? -1.0 : +1.0) * centrifugal * cent_mom * scale_cen * centrifugal_rad,
             + buoyancy_u,
             - sponge * u_ijk };
         const bool eq_ = (j >= NeptUb::st().j_lo && j <= NeptUb::st().j_hi);
@@ -638,7 +650,7 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
         - transport_v
         + diffusion_v / re_eff + diffusion_v * nue_t
         - Coriolis    * scale_Cor * Coriolis_the
-        + (cent_legacy ? -1.0 : +1.0) * centrifugal * scale_cen * centrifugal_the;
+        + (cent_legacy ? -1.0 : +1.0) * centrifugal * cent_mom * scale_cen * centrifugal_the;
 
     // ATNEPT_VBUDGET (print-only, see VbNept.h): the terms of rhs_v against latitude at one level
     // and one meridian, stage 0. Signs as they enter the sum above, so they add to T_TOT.
@@ -651,7 +663,7 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
         t_[NeptVb::T_MET][j]  = - met_;
         t_[NeptVb::T_DIFF][j] = diffusion_v / re_eff + diffusion_v * nue_t;
         t_[NeptVb::T_COR][j]  = - Coriolis * scale_Cor * Coriolis_the;
-        t_[NeptVb::T_CEN][j]  = (cent_legacy ? -1.0 : +1.0) * centrifugal * scale_cen * centrifugal_the;
+        t_[NeptVb::T_CEN][j]  = (cent_legacy ? -1.0 : +1.0) * centrifugal * cent_mom * scale_cen * centrifugal_the;
         t_[NeptVb::T_TOT][j]  = rhs_v.x[i][j][k];
     }
 
