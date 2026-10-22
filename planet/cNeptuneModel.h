@@ -546,12 +546,22 @@ public:
     // because rho_mix is zero until computeMixtureDensity has run, and a zero here would divide
     // through the whole adjustment. Default 0 = the constant r_mix everywhere, which is what
     // ATNEPT has always used. Exactly ATSAT's and ATJUP's rho_at().
+    //
+    // ATNEPT_RHO_FLOOR=<kg/m3> (2026-10-22, DEFAULT 1e-4, user; 0 = no floor; acts only with LOCAL_RHO): the
+    // local density is held at least at this value. ATNEPT's 550 km shell reaches 6.3e-12 kg/m3 at
+    // the lid, so the latent-heat divisor cp_mix * rho goes to zero there and one condensation step
+    // heats without bound: with LOCAL_RHO + INIT_SPECIES_LOCAL_RHO it went NaN in iteration 10
+    // (IS16lr_NEPT). ATURAN's top, stable with both, is 1.1e-4. Floors 1e-4 and 1e-3 both ran 16 it
+    // stably with every gas converged (RF4_NEPT / RF3_NEPT); 1e-4 is the smaller intervention.
     double rho_at(int i, int j, int k){
         static const int local = [](){
             const char* e = getenv("ATNEPT_LOCAL_RHO"); return e ? atoi(e) : 0; }();
+        static const double floor_rho = [](){
+            const char* e = getenv("ATNEPT_RHO_FLOOR"); return e ? atof(e) : 1.0e-4; }();
         if(!local) return r_mix;
         const double rho = rho_mix.x[i][j][k];
-        return (rho > 0.0 && std::isfinite(rho)) ? rho : r_mix;
+        if(!(rho > 0.0 && std::isfinite(rho))) return r_mix;
+        return (rho < floor_rho) ? floor_rho : rho;
     }
 
     // ATNEPT_INIT_SPECIES_LOCAL_RHO=1 (2026-10-22, default 0): the species SET-UP uses the local
