@@ -14,3 +14,4 @@
 class cNeptuneModel;
 
 typedef ConvectiveAdjustment<cNeptuneModel> ConvectiveAdjustmentNept;
+typedef MoistConvectiveAdjustment<cNeptuneModel> MoistConvectiveAdjustmentNept;

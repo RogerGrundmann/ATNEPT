@@ -56,6 +56,7 @@ class cNeptuneModel{
     // model to take these; see ParaViewWriter.h for what it provides and what it does not.
     template<class M> friend class ParaViewWriter;
     template<class M> friend class ConvectiveAdjustment;
+    template<class M> friend class MoistConvectiveAdjustment;
     template<class M> friend class FluxLimiter;
     template<class M> friend class SaturationAdjustment;
     template<class M> friend class PressureSolver;
@@ -82,6 +83,13 @@ public:
     // shared header can say which planet it is running on without knowing anything else
     // about it. ATSAT and ATJUP carry the same accessor.
     static const char* planet_tag(){ return "ATNEPT"; }
+    // ATNEPT_SVP_FIT=1 (2026-10-26, default 0 = off): the shared fitted NH3 liquid / NH3 ice / H2O ice vapour
+    // pressures (ATPhys.h, sources at ATJUP's setSvpFit), set before the thermal properties.
+    static bool svp_fit(){
+        static const bool v = [](){ const char* e = getenv("ATNEPT_SVP_FIT"); return e && atoi(e) != 0; }();
+        return v;
+    }
+    void setSvpFit();
 
     /*
      * ---- Temperature bounds for the RK4 integrator, as PHYSICAL temperatures ----
