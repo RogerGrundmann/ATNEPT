@@ -562,9 +562,16 @@ public:
     // heats without bound: with LOCAL_RHO + INIT_SPECIES_LOCAL_RHO it went NaN in iteration 10
     // (IS16lr_NEPT). ATURAN's top, stable with both, is 1.1e-4. Floors 1e-4 and 1e-3 both ran 16 it
     // stably with every gas converged (RF4_NEPT / RF3_NEPT); 1e-4 is the smaller intervention.
+    // DEFAULT 1 since 2026-10-27 (user: "_LOCAL_RHO=1 needs to be done first", before the MCA default):
+    // the saturation / precipitation / MCA groups read the local density p/(R_mix T); 0 = the constant r_mix.
+    // <TAG>_INIT_SPECIES_LOCAL_RHO follows it (unset), without which LOCAL_RHO went NaN in it 2 (LR16, 10-22).
+    static bool local_rho(){
+        static const bool v = [](){
+            const char* e = getenv("ATNEPT_LOCAL_RHO"); return e ? atoi(e) != 0 : true; }();
+        return v;
+    }
     double rho_at(int i, int j, int k){
-        static const int local = [](){
-            const char* e = getenv("ATNEPT_LOCAL_RHO"); return e ? atoi(e) : 0; }();
+        const bool local = local_rho();
         static const double floor_rho = [](){
             const char* e = getenv("ATNEPT_RHO_FLOOR"); return e ? atof(e) : 1.0e-4; }();
         if(!local) return r_mix;
@@ -573,7 +580,7 @@ public:
         return (rho < floor_rho) ? floor_rho : rho;
     }
 
-    // ATNEPT_INIT_SPECIES_LOCAL_RHO=1 (2026-10-22, default 0): the species SET-UP uses the local
+    // ATNEPT_INIT_SPECIES_LOCAL_RHO=1 (2026-10-22; default since 2026-10-27 = ATNEPT_LOCAL_RHO, i.e. 1): the species SET-UP uses the local
     // density p/(R_mix T) where it used the constant r_mix. The profiles are built as
     // factor * rho * q_sat and capped at fr * r_max, fr = rho / r_mix, so the cap is a fixed mass
     // fraction; the init damp_wiggles of the species runs on c / rho instead of c; and rho_mix is
@@ -581,9 +588,9 @@ public:
     // to r_mix. Why: ATSAT with ATSAT_LOCAL_RHO=1 went NaN in iteration 2 (2026-10-22, LR16_SAT) at the
     // lid, CH4 vapour 0.0264 kg/m3 against an air density of 0.0121 -- r_mix-scaled densities that
     // the damp had carried up the steep density gradient (i=39 0.0037 -> 0.0163 kg/m3).
-    // With the knob unset every value below is exactly the old one (fr = 1.0, rho_init = r_mix).
+    // With the knob = 0 (or <TAG>_LOCAL_RHO=0) every value below is exactly the old one (fr = 1.0, rho_init = r_mix).
     static bool init_species_local_rho(){
-        static const bool v = [](){ const char* e = getenv("ATNEPT_INIT_SPECIES_LOCAL_RHO"); return e && atoi(e) != 0; }();
+        static const bool v = [](){ const char* e = getenv("ATNEPT_INIT_SPECIES_LOCAL_RHO"); return e ? atoi(e) != 0 : local_rho(); }();
         return v;
     }
     double rho_init(int i, int j, int k){

@@ -220,7 +220,8 @@ and turbulence remain diagnostic-only here.
 | `ATNEPT_PRESS_SOLVER` | *see code* | pressure-solver selection |
 | `ATNEPT_STEADY` | 1 | steady-state query in the report |
 | `ATNEPT_METRIC_RADIUS` | **24622** | Neptune's mean radius in km, referring the 1/r metric factors to the planet rather than to `rad.z`'s 1..2. **ON by default** — set to `0` for the unshifted metric, which is bit-identical to the pre-flip default |
-| `ATNEPT_LOCAL_RHO`, `ATNEPT_COSTHE_ABS`, `ATNEPT_PDYN_UNITS` | — | legacy/behaviour switches |
+| `ATNEPT_LOCAL_RHO` | 1 | local density p/(R_mix T) in the saturation / precipitation / MCA groups (since 2026-10-27; 0 = constant r_mix); `ATNEPT_INIT_SPECIES_LOCAL_RHO` follows it |
+| `ATNEPT_COSTHE_ABS`, `ATNEPT_PDYN_UNITS` | — | legacy/behaviour switches |
 
 ---
 
