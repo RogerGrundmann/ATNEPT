@@ -884,7 +884,9 @@ private:
 
 // molecular weights
     double m_h2 = 2.016;  // molecular weight of hydrogen in kg/Kmol (molar mass)
-    double m_he = 4.02602;  // molecular weight of helium in kg/Kmol
+    // molecular weight of helium in kg/Kmol: 4.0026 since 2026-10-27 (was the typo 4.02602, ATJUP row JUP-MHE;
+    // ATNEPT_M_HE=4.02602 restores)
+    double m_he = [](){ const char* e = getenv("ATNEPT_M_HE"); return e ? atof(e) : 4.0026; }();
     double m_nh3 = 17.03052;  // molecular weight of ammonia in kg/Kmol
     // Reaction enthalpy of NH3(g) + H2S(g) -> NH4SH(s), per kg of NH4SH formed.
     //
