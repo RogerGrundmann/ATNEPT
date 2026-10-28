@@ -165,7 +165,8 @@ and turbulence remain diagnostic-only here.
 | `ATNEPT_TURB_MODEL` | *param* | override `turb_model` (`k_epsilon`, `k_omega`, `k_omega_SST`) |
 | `ATNEPT_TURB_COUPLING` | 0.0 | feed the eddy viscosity into momentum, heat and species diffusion |
 | `ATNEPT_CONV_ADJ` | 0 | dry convective adjustment |
-| `ATNEPT_MCA` | 0 | moist convective adjustment with the Ledoux criterion every N iterations (H2O, NH3, H2S, CH4; shared `ConvectiveAdjustment.h`, knobs `_MCA_LEDOUX` `_LOADING` `_RELAX` `_PASSES` `_DEBUG`); meaningful with `ATNEPT_LOCAL_RHO=1` |
+| `ATNEPT_MCA` | 1 | moist convective adjustment with the Ledoux criterion every N iterations (H2O, NH3, H2S, CH4; shared `ConvectiveAdjustment.h`, knobs `_MCA_LEDOUX` `_LOADING` `_RELAX` `_PASSES` `_DEBUG`); meaningful with `ATNEPT_LOCAL_RHO=1` |
+| `ATNEPT_INIT_SUPERSAT` | 1 (since 2026-10-28; 1000 = the old 1e3) | factor on saturation in the set-up vapour (capped at the deep abundance); 1e3 started every deck up to 1000x supersaturated, and the set-up saturation adjustment then warmed the decks by up to 15-19 K over the dry adiabat, which the MCA fired on in 89-100 % of columns on every call; with 1 it settles to 0 % from call 5 |
 | `ATNEPT_SVP_FIT` | 0 | fitted NH3 liquid / NH3 ice / H2O ice vapour pressures (shared `ATPhys.h`; NIST Antoine, Fray & Schmitt 2009, Murphy & Koop 2005); the ice sets act where the shared adjustment is selected (`ATNEPT_SATADJ=1`) |
 | `ATNEPT_SATADJ` | 1 | shared saturation adjustment, the default since 2026-10-10 (0 = the inherited routine) |
 | `ATNEPT_CHEM_ENTHALPY` | *see code* | reaction-enthalpy branch in `thermalmassflux` |

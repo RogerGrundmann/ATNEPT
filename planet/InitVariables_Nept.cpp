@@ -526,8 +526,16 @@ void cNeptuneModel::init_vapour_cloud_ice(std::string gas,
 
         magnus = 1e3;
     }
+    // ATNEPT_INIT_SUPERSAT=<f> (2026-10-28, ATJUP row GIANTS-MCA-DEFAULT; DEFAULT 1 since 2026-10-28, user: "commit
+    // ATNEPT"; =1000 restores the 1e3 above): the vapour set-up
+    // is magnus x saturation, capped at the deep abundance, so with 1e3 every deck starts up to 1000x
+    // supersaturated; the set-up saturation adjustment condenses the excess and its latent heat
+    // warms the decks +14.7 K (i1) / +17.4 K (i6) over the dry adiabat at the equator -- the steep
+    // pairs the MCA fires on (satchk/mcagiants_2026-10-28/dbg). 1 = vapour at saturation.
+    static const double init_supersat = [](){ const char* e = getenv("ATNEPT_INIT_SUPERSAT"); return e ? atof(e) : 1.0; }();
+    if(init_supersat > 0.0) magnus = init_supersat;
 
-// water vapour distribution decreases approaching tropopause,  
+// water vapour distribution decreases approaching tropopause,
 //    at p_stat = 1.0 bar = 1013.0 hPa ... E_Rain = 0.0061 bar = 6,1 hPa (t_u = 0°C) ... E_Rain = 0.00564 bar = 56.4 hPa (t_u = -35°C)
 
 //       initial distribution of  humid atmosphere, cloud and ice

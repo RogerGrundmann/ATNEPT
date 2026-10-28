@@ -111,14 +111,14 @@ static int radiation_enabled(){
     return v;
 }
 
-// ATNEPT_MCA=<N> (2026-10-26, DEFAULT 0 = off): the moist convective adjustment with the Ledoux criterion
+// ATNEPT_MCA=<N> (2026-10-26; DEFAULT 1 since 2026-10-27, user: "port the MCA default to the giants"; 0 = off): the moist convective adjustment with the Ledoux criterion
 // (MoistConvectiveAdjustmentNept, shared ConvectiveAdjustment.h, where its note and knobs are) every N
 // iterations, right after the dry one. Ported from ATJUP. It mass-weights with rho_at() and reads mass
 // fractions as c / rho_at(), so it means what it says only with ATNEPT_LOCAL_RHO=1 (with the constant r_mix
 // every layer weighs the same). No tracer carries a formation enthalpy here (the NH4SH chemistry
 // releases none).
 static int mca_stride(){
-    static const int v = [](){ const char* e = getenv("ATNEPT_MCA"); return e ? std::max(0, atoi(e)) : 0; }();
+    static const int v = [](){ const char* e = getenv("ATNEPT_MCA"); return e ? std::max(0, atoi(e)) : 1; }();
     return v;
 }
 
