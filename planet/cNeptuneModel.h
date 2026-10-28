@@ -610,6 +610,8 @@ public:
     // leaves the field alone — one of the two models' behaviours had to be named rather than
     // assumed.
     static bool satadj_updates_pstat(){ return false; }
+    // <TAG>_MCA_INTERIOR default (shared ConvectiveAdjustment.h): leave the radial boundary planes out of the MCA column.
+    static bool mca_default_interior(){ return false; }
     // Defaults of ATNEPT_SATADJ_NEWTON and ATNEPT_SATADJ_CONSERVE (shared SaturationAdjustment.h): ON since
     // 2026-10-09. They act only when the shared routine is selected (ATNEPT_SATADJ, this model's
     // default since 2026-10-10). Run for 16 iterations: without them the shared
