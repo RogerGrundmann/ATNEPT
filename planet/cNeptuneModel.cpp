@@ -1184,6 +1184,8 @@ void cNeptuneModel::Run(){
         if(iter_n % checkpoint == 0) printMinMax();
         if(vb_every > 0 && iter_n % vb_every == 0) vb_print();
         if(vtk_stride > 0 ? (iter_n % vtk_stride == 0) : (iter_n % checkpoint == 0)) writeData();
+        // ATNEPT_CLOUDVIEW_STRIDE=<n> > 0 (cNeptuneModel.h): the cloudview on its own cadence; unset rides with the panorama in writeData.
+        if(cloudview_stride() > 0 && iter_n % cloudview_stride() == 0) paraview_cloudview(iter_n);
 
         if(panorama_cnt == panorama_print) panorama_cnt = 0;
 

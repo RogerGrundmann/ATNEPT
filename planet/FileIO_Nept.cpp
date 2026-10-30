@@ -34,6 +34,8 @@ void cNeptuneModel::writeData(){
     if(paraview_flag && (iter_n % panorama_print == 0)){
         paraview_panorama_vts(iter_n);
 //        paraview_sphere_vts(iter_n);
+        // ATNEPT_CLOUDVIEW_STRIDE (cNeptuneModel.h): unset = the from-above cloud columns with every panorama.
+        if(cloudview_stride() < 0) paraview_cloudview(iter_n);
     }
 
     NeptunePlotData();
