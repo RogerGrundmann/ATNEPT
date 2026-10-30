@@ -611,7 +611,10 @@ public:
     // assumed.
     static bool satadj_updates_pstat(){ return false; }
     // <TAG>_MCA_INTERIOR default (shared ConvectiveAdjustment.h): leave the radial boundary planes out of the MCA column.
-    static bool mca_default_interior(){ return false; }
+    // true since 2026-10-30 (user: "MCA_INTERIOR should go on for ATJUP, ATSAT and ATNEPT"), as on ATURAN: bcRadius writes the
+    // radial boundary planes from the interior and RK does not integrate them, so mixing them is undone every iteration.
+    // <TAG>_MCA_INTERIOR=0 restores.
+    static bool mca_default_interior(){ return true; }
     // Defaults of ATNEPT_SATADJ_NEWTON and ATNEPT_SATADJ_CONSERVE (shared SaturationAdjustment.h): ON since
     // 2026-10-09. They act only when the shared routine is selected (ATNEPT_SATADJ, this model's
     // default since 2026-10-10). Run for 16 iterations: without them the shared
