@@ -326,6 +326,9 @@ void cNeptuneModel::RungeKuttaNept(){
                                        : acc_nh3_ice.x[i][j][k] + wgt * rhs_nh3_ice.x[i][j][k];
                     acc_nh4sh.x[i][j][k] = (stage == 0) ? wgt * rhs_nh4sh.x[i][j][k]
                                        : acc_nh4sh.x[i][j][k] + wgt * rhs_nh4sh.x[i][j][k];
+                    if(chrom_on())
+                        acc_chrom.x[i][j][k] = (stage == 0) ? wgt * rhs_chrom.x[i][j][k]
+                                          : acc_chrom.x[i][j][k] + wgt * rhs_chrom.x[i][j][k];
 
                     if(stage < 3){
                         t.x[i][j][k] = tn.x[i][j][k] + c_in * rhs_t.x[i][j][k];
@@ -351,6 +354,7 @@ void cNeptuneModel::RungeKuttaNept(){
                         nh3_cloud.x[i][j][k] = nh3_cloudn.x[i][j][k] + c_in * rhs_nh3_cloud.x[i][j][k];
                         nh3_ice.x[i][j][k] = nh3_icen.x[i][j][k] + c_in * rhs_nh3_ice.x[i][j][k];
                         nh4sh.x[i][j][k] = nh4shn.x[i][j][k] + c_in * rhs_nh4sh.x[i][j][k];
+                        if(chrom_on()) chrom.x[i][j][k] = chromn.x[i][j][k] + c_in * rhs_chrom.x[i][j][k];
                     }
                 }
             }
@@ -386,6 +390,8 @@ void cNeptuneModel::RungeKuttaNept(){
                 nh3_cloud.x[i][j][k] = nh3_cloudn.x[i][j][k] + dt * acc_nh3_cloud.x[i][j][k] / 6.0;
                 nh3_ice.x[i][j][k] = nh3_icen.x[i][j][k] + dt * acc_nh3_ice.x[i][j][k] / 6.0;
                 nh4sh.x[i][j][k] = nh4shn.x[i][j][k] + dt * acc_nh4sh.x[i][j][k] / 6.0;
+                if(chrom_on())   // ATNEPT_CHROM: not in the species clamp, so floored here, as ATJUP does
+                    chrom.x[i][j][k] = std::max(0.0, chromn.x[i][j][k] + dt * acc_chrom.x[i][j][k] / 6.0);
             }
         }
     }

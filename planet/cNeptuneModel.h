@@ -234,6 +234,7 @@ public:
     Array acc_nh3_cloud;
     Array acc_nh3_ice;
     Array acc_nh4sh;
+    Array acc_chrom;
 
     Array P_rain;
     Array P_snow;
@@ -1156,6 +1157,16 @@ private:
     static int cloudview_stride(){
         static const int s = [](){ const char* e = getenv("ATNEPT_CLOUDVIEW_STRIDE"); return e ? atoi(e) : -1; }();
         return s; }
+    // ATNEPT_CHROM=1 (2026-10-30, default 0 = off: chrom stays 0 everywhere, no output carries it): the
+    // chromophore tracer, ported from ATJUP_CHROM / ATSAT_CHROM with CH4 as the source -- a passive species made
+    // by UV photolysis where the UV reaches (source vapour self-shielding) and destroyed with a lifetime.
+    // The rates live in ChromNept.h.
+    static bool chrom_on(){
+        static const bool v = [](){ const char* e = getenv("ATNEPT_CHROM"); return e && atoi(e) != 0; }();
+        return v; }
+    double chromSource(int i, int j, int k);           // ChromNept.h, nondimensional d(chrom)/dt
+    void chromUV();                                     // ChromNept.h, chrom_uv once per iteration
+    void chromInfo();                                   // ChromNept.h, the startup line
 
     void searchMinMax_3D(string, string, 
         string, Array &, double coeff=1., 
@@ -1254,6 +1265,8 @@ private:
     Array nh3_cloud;            // nh3-cloud
     Array nh3_ice;                // nh3-ice
     Array nh4sh;                    // nh4sh-vapour
+    Array chrom;                    // chromophore tracer, kg/m3 (ATNEPT_CHROM; ChromNept.h)
+    Array chrom_uv;                 // UV fraction reaching the cell, exp(-N_src,above / N_uv) (ChromNept.h)
 
     Array tn;                    // temperature new
     Array un;                    // u-velocity component in r-direction new
@@ -1272,6 +1285,7 @@ private:
     Array nh3_cloudn;            // nh3_cloud new
     Array nh3_icen;                 // nh3_ice new
     Array nh4shn;                    // nh4sh new
+    Array chromn;                    // chromophore new
 
     Array rho_mix;         // local mixture density from ideal gas law
 
@@ -1406,6 +1420,7 @@ private:
     Array rhs_nh3_cloud;        // auxilliar field RHS nh3_cloud
     Array rhs_nh3_ice;            // auxilliar field RHS nh3_ice
     Array rhs_nh4sh;                // auxilliar field RHS nh4sh
+    Array rhs_chrom;                // auxilliar field RHS chromophore
 
     Array aux;                // auxilliar field u-velocity component
     Array aux_u;                // auxilliar field u-velocity component
