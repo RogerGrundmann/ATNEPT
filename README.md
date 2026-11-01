@@ -166,6 +166,7 @@ and turbulence remain diagnostic-only here.
 | `ATNEPT_TURB_MODEL` | *param* | override `turb_model` (`k_epsilon`, `k_omega`, `k_omega_SST`) |
 | `ATNEPT_TURB_COUPLING` | 1.0 | feed the eddy viscosity into momentum, heat and species diffusion; default 1.0 since 2026-11-01, 0 restores |
 | `ATNEPT_TURB_FREE` | 1 | no wall law and no surface boundary layer in the closure: uniform background k / omega at the start, u_tau the calm-air floor everywhere, the k-epsilon / SST wall distance 'far' (free-flow form); 0 restores the ATOM surface picture (row GIANTS-TURB-FREE, 2026-11-01) |
+| `ATNEPT_TURB_CLAMP_PASS` | 1 | the closure's clamp (k >= 0, omega >= min) runs as a pass before its source loop and the k floor / caps as a pass after it, so the loop no longer reads half-updated neighbours and the result does not depend on the thread count; 0 restores the in-loop form (row SAT-TURB-THREADS, 2026-11-01) |
 | `ATNEPT_CONV_ADJ` | 0 | dry convective adjustment |
 | `ATNEPT_MCA` | 1 | moist convective adjustment with the Ledoux criterion every N iterations (H2O, NH3, H2S, CH4; shared `ConvectiveAdjustment.h`, knobs `_MCA_LEDOUX` `_LOADING` `_RELAX` `_PASSES` `_DEBUG`); meaningful with `ATNEPT_LOCAL_RHO=1` |
 | `ATNEPT_MCA_INTERIOR` | 1 | 1 = leave the radial boundary planes i = 0 and i = im-1 out of the MCA column (shared `ConvectiveAdjustment.h`, `mca_default_interior()`; 1 by default on all four since 2026-10-30, on ATURAN since 10-28, where mixing the floor plane looped against `bcRadius`; 0 = the old column) |
