@@ -164,7 +164,8 @@ and turbulence remain diagnostic-only here.
 | `ATNEPT_PRECIP_DIAG=1` | off | print-only: per species the mean column-max precipitation flux, its latent flux against the emitted flux, and the cells on the flux cap |
 | `ATNEPT_TURB` | unset | the closure runs whenever `turb_model` is not `none` (default since 2026-10-11); `ATNEPT_TURB=0` switches it off |
 | `ATNEPT_TURB_MODEL` | *param* | override `turb_model` (`k_epsilon`, `k_omega`, `k_omega_SST`) |
-| `ATNEPT_TURB_COUPLING` | 0.0 | feed the eddy viscosity into momentum, heat and species diffusion |
+| `ATNEPT_TURB_COUPLING` | 1.0 | feed the eddy viscosity into momentum, heat and species diffusion; default 1.0 since 2026-11-01, 0 restores |
+| `ATNEPT_TURB_FREE` | 1 | no wall law and no surface boundary layer in the closure: uniform background k / omega at the start, u_tau the calm-air floor everywhere, the k-epsilon / SST wall distance 'far' (free-flow form); 0 restores the ATOM surface picture (row GIANTS-TURB-FREE, 2026-11-01) |
 | `ATNEPT_CONV_ADJ` | 0 | dry convective adjustment |
 | `ATNEPT_MCA` | 1 | moist convective adjustment with the Ledoux criterion every N iterations (H2O, NH3, H2S, CH4; shared `ConvectiveAdjustment.h`, knobs `_MCA_LEDOUX` `_LOADING` `_RELAX` `_PASSES` `_DEBUG`); meaningful with `ATNEPT_LOCAL_RHO=1` |
 | `ATNEPT_MCA_INTERIOR` | 1 | 1 = leave the radial boundary planes i = 0 and i = im-1 out of the MCA column (shared `ConvectiveAdjustment.h`, `mca_default_interior()`; 1 by default on all four since 2026-10-30, on ATURAN since 10-28, where mixing the floor plane looped against `bcRadius`; 0 = the old column) |
@@ -406,7 +407,7 @@ None of these stops a run; all of them affect what a result means.
    measuring the ceiling of the grid.
 
 5. **The precipitation and turbulence modules are diagnostic-only here.** They fill their arrays and
-   nothing reads them back: `S_precip_*` reaches no RHS and `ATNEPT_TURB_COUPLING` defaults to 0.
+   nothing reads them back: `S_precip_*` reaches no RHS (`ATNEPT_TURB_COUPLING` defaults to 1.0 since 2026-11-01).
    Switching either on changes plots, not physics. Radiation is no longer in this list — it can now
    reach `rhs_t` through `ATNEPT_RAD_COUPLING`, which is off by default; see item 8.
 
