@@ -617,6 +617,10 @@ public:
     // radial boundary planes from the interior and RK does not integrate them, so mixing them is undone every iteration.
     // <TAG>_MCA_INTERIOR=0 restores.
     static bool mca_default_interior(){ return true; }
+    // <TAG>_MCA_PHASE default (shared ConvectiveAdjustment.h): 1 since 2026-11-03 (user: "yes, as you propose"; row
+    // GIANTS-CH4-PHASE): the MCA settles mixed cells with the saturation adjustment's temperature split instead
+    // of all ice below t_0, which had removed the liquid the adjustment made. =0 restores.
+    static bool mca_default_phase(){ return true; }
     // Defaults of ATNEPT_SATADJ_NEWTON and ATNEPT_SATADJ_CONSERVE (shared SaturationAdjustment.h): ON since
     // 2026-10-09. They act only when the shared routine is selected (ATNEPT_SATADJ, this model's
     // default since 2026-10-10). Run for 16 iterations: without them the shared

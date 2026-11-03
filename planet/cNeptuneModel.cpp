@@ -771,17 +771,40 @@ void cNeptuneModel::Run(){
             }
         }
         return s_ * 1.0e3 / cw_norm; };
+    // ATNEPT_CWB_PHASE=1 (2026-11-03, print-only, with ATNEPT_CWB_DIAG; row GIANTS-CH4-PHASE): the same stages, but the
+    // vapour, cloud and ice columns of each gas apart, so a stage that turns liquid into ice shows as cloud - / ice +.
+    // The Runge-Kutta step is one row (reset to the n-level copies) plus one row (the step itself, all terms).
+    static const bool cwp_on = [](){ const char* e = getenv("ATNEPT_CWB_PHASE"); return e ? atoi(e) != 0 : false; }();
+    double cwp_sum[NeptCwb::NGAS][3][TB_N] = {{{0.0}}}, cwp_last[NeptCwb::NGAS][3] = {{0.0}}, cwp_first[NeptCwb::NGAS][3] = {{0.0}};
+    auto cwp_col = [&](Array* f) -> double {
+        double s_ = 0.0;
+        #pragma omp parallel for collapse(2) schedule(static) reduction(+:s_)
+        for(int k = 0; k < km; k++){
+            for(int j = 0; j < jm; j++){
+                const double sj = std::sin(the.z[j]);
+                for(int i = 0; i < im; i++){
+                    const double dz = layer_thickness_m(i);
+                    if(dz > 0.0) s_ += sj * dz * f->x[i][j][k];
+                }
+            }
+        }
+        return s_ * 1.0e3 / cw_norm; };
     auto cwb_mark = [&](int stage){
         if(!cwb_on) return;
         for(int g_ = 0; g_ < NeptCwb::NGAS; g_++){
             const double w_ = cwb_col(cw_f[g_], 0);
             cw_sum[g_][stage] += w_ - cw_last[g_]; cw_last[g_] = w_;
+            if(cwp_on) for(int p_ = 0; p_ < 3; p_++){
+                const double v_ = cwp_col(cw_f[g_][p_]);
+                cwp_sum[g_][p_][stage] += v_ - cwp_last[g_][p_]; cwp_last[g_][p_] = v_;
+            }
         } };
     if(cwb_on){
         for(int j = 0; j < jm; j++) cw_norm += std::sin(the.z[j]) * km;
         for(int g_ = 0; g_ < NeptCwb::NGAS; g_++){
             cw_last[g_] = cw_first[g_] = cwb_col(cw_f[g_], 0);
             cw_first0[g_] = cwb_col(cw_f[g_], 1);
+            if(cwp_on) for(int p_ = 0; p_ < 3; p_++) cwp_last[g_][p_] = cwp_first[g_][p_] = cwp_col(cw_f[g_][p_]);
         }
     }
 
@@ -931,9 +954,10 @@ void cNeptuneModel::Run(){
                 for(int i = 0; i < im; i++) NeptTb::st().acc[t_][q_][i] = 0.0;
         }
 
-        double cw_n[NeptCwb::NGAS] = {0.0};
+        double cw_n[NeptCwb::NGAS] = {0.0}, cwp_n[NeptCwb::NGAS][3] = {{0.0}};
         if(cwb_on){
             for(int g_ = 0; g_ < NeptCwb::NGAS; g_++) cw_n[g_] = cwb_col(cw_fn[g_], 0);    // what the step starts from
+            if(cwp_on) for(int g_ = 0; g_ < NeptCwb::NGAS; g_++) for(int p_ = 0; p_ < 3; p_++) cwp_n[g_][p_] = cwp_col(cw_fn[g_][p_]);
             for(int t_ = 0; t_ < NeptCwb::MAXTHR; t_++) for(int g_ = 0; g_ < NeptCwb::NGAS; g_++)
                 for(int q_ = 0; q_ < 8; q_++) NeptCwb::st().acc[t_][g_][q_] = 0.0;
         }
@@ -979,6 +1003,12 @@ void cNeptuneModel::Run(){
                 cw_sum[g_][TB_RK_RESET] += cw_n[g_] - cw_last[g_];
                 cw_sum[g_][TB_RK_REST]  += w_ - cw_n[g_] - step_terms;
                 cw_last[g_] = w_;
+                if(cwp_on) for(int p_ = 0; p_ < 3; p_++){               // ATNEPT_CWB_PHASE: reset, then the whole step
+                    const double v_ = cwp_col(cw_f[g_][p_]);
+                    cwp_sum[g_][p_][TB_RK_RESET] += cwp_n[g_][p_] - cwp_last[g_][p_];
+                    cwp_sum[g_][p_][TB_RK_REST]  += v_ - cwp_n[g_][p_];
+                    cwp_last[g_][p_] = v_;
+                }
             }
         }
 
@@ -1092,13 +1122,13 @@ void cNeptuneModel::Run(){
             // H2S has no ice coefficient set here; its liquid set stands for both phases, as in the model's own adjustment.
             std::vector<Gas_> gases = {
                 { "H2O", &h2o, &h2o_cloud, &h2o_ice, ep_h2o, lv_h2o, ls_h2o, t_0_h2o,
-                  C_h2o, L0_h2o, R_h2o, del_alf_h2o, del_bet_h2o, C_h2o_ice, L0_h2o_ice, del_alf_h2o_ice, del_bet_h2o_ice },
+                  C_h2o, L0_h2o, R_h2o, del_alf_h2o, del_bet_h2o, C_h2o_ice, L0_h2o_ice, del_alf_h2o_ice, del_bet_h2o_ice, t_00_h2o },
                 { "NH3", &nh3, &nh3_cloud, &nh3_ice, ep_nh3, lv_nh3, ls_nh3, t_0_nh3,
-                  C_nh3, L0_nh3, R_nh3, del_alf_nh3, del_bet_nh3, C_nh3_ice, L0_nh3_ice, del_alf_nh3_ice, del_bet_nh3_ice },
+                  C_nh3, L0_nh3, R_nh3, del_alf_nh3, del_bet_nh3, C_nh3_ice, L0_nh3_ice, del_alf_nh3_ice, del_bet_nh3_ice, t_00_nh3 },
                 { "H2S", &h2s, &h2s_cloud, &h2s_ice, ep_h2s, lv_h2s, ls_h2s, t_0_h2s,
-                  C_h2s, L0_h2s, R_h2s, del_alf_h2s, del_bet_h2s, C_h2s, L0_h2s, del_alf_h2s, del_bet_h2s },
+                  C_h2s, L0_h2s, R_h2s, del_alf_h2s, del_bet_h2s, C_h2s, L0_h2s, del_alf_h2s, del_bet_h2s, t_00_h2s },
                 { "CH4", &ch4, &ch4_cloud, &ch4_ice, ep_ch4, lv_ch4, ls_ch4, t_0_ch4,
-                  C_ch4, L0_ch4, R_ch4, del_alf_ch4, del_bet_ch4, C_ch4_ice, L0_ch4_ice, del_alf_ch4_ice, del_bet_ch4_ice } };
+                  C_ch4, L0_ch4, R_ch4, del_alf_ch4, del_bet_ch4, C_ch4_ice, L0_ch4_ice, del_alf_ch4_ice, del_bet_ch4_ice, t_00_ch4 } };
             std::vector<Tr_> tracers = { { "NH4SH", &nh4sh, 0.0, true, 0.0 } };
             if(chrom_on()) tracers.push_back({ "chrom", &chrom, 0.0, false, 0.0 });   // ATNEPT_CHROM: mixed as ATJUP mixes it
             MoistConvectiveAdjustmentNept(*this, gases, tracers).run();
@@ -1174,6 +1204,14 @@ void cNeptuneModel::Run(){
                         }
                 }
                 printf("      ATNEPT: [CWB] %s   %-46s %+.6e\n", cw_gas[g_], "unattributed", cw_last[g_] - cw_first[g_] - sum_);
+                if(cwp_on){
+                    printf("      ATNEPT: [CWBP] %s by phase, g/m2, cumulative 1..%d:  %-44s %14s %14s %14s\n", cw_gas[g_], iter_n, "stage", "vapour", "cloud", "ice");
+                    printf("      ATNEPT: [CWBP] %s   %-46s %+14.6e %+14.6e %+14.6e\n", cw_gas[g_], "start (column)", cwp_first[g_][0], cwp_first[g_][1], cwp_first[g_][2]);
+                    for(int q_ = 0; q_ < TB_N; q_++)
+                        printf("      ATNEPT: [CWBP] %s   %-46s %+14.6e %+14.6e %+14.6e\n", cw_gas[g_],
+                               q_ == TB_RK_REST ? "RungeKutta: the step (all terms)" : cw_name[q_], cwp_sum[g_][0][q_], cwp_sum[g_][1][q_], cwp_sum[g_][2][q_]);
+                    printf("      ATNEPT: [CWBP] %s   %-46s %+14.6e %+14.6e %+14.6e\n", cw_gas[g_], "now (column)", cwp_last[g_][0], cwp_last[g_][1], cwp_last[g_][2]);
+                }
             }
         }
 
