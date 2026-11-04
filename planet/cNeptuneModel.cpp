@@ -297,6 +297,8 @@ void cNeptuneModel::Run(){
     AtomUtils::damp_wiggles(v, nullptr, true, true, true);
     AtomUtils::damp_wiggles(w, nullptr, true, true, true);
 
+    if(VelocityInitializerNept::cell_init()) VelocityInitializerNept(*this).cellStreamfunction();   // ATNEPT_CELL_INIT (default 0): divergence-free initial cells, as ATSAT
+
 
     if(svp_fit()) setSvpFit();                       // ATNEPT_SVP_FIT, before any SVP is evaluated
     ChemistryNept(*this).ThermalPropertiesNept();

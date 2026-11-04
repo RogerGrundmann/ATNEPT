@@ -15,6 +15,9 @@
 #include "Utils.h"
 
 #include <iostream>
+#include <vector>
+#include <cmath>
+#include <algorithm>
 #include <chrono>
 
 #ifdef _OPENMP
@@ -120,7 +123,7 @@ public:
         // ATNEPT_VBUDGET at iteration 1 showed it as the only term left in dv/dt (its diffusion),
         // its Coriolis force on w then bending the jets at the flank. 0 starts v at zero.
         static const double v_init_scale = [](){
-            const char* e = getenv("ATNEPT_V_INIT_SCALE"); return e ? atof(e) : (cNeptuneModel::geo_balance() ? 0.0 : 1.0); }();
+            const char* e = getenv("ATNEPT_V_INIT_SCALE"); return e ? atof(e) : ((cNeptuneModel::geo_balance() && !cell_init()) ? 0.0 : 1.0); }();  // ATNEPT_CELL_INIT=1 keeps the cell (see cell_init())
         if(v_init_scale != 1.0)
             printf("      ATNEPT: ATNEPT_V_INIT_SCALE = %.4g (prescribed meridional cell scaled)\n", v_init_scale);
 
@@ -138,6 +141,83 @@ public:
         }
         cout << "      AGCM: init_velocities ended" << endl;
         return;
+    }
+
+    // ATNEPT_CELL_INIT (2026-11-04, ported from ATSAT_CELL_INIT, InitVelocity_Sat.cpp initCellStreamfunction;
+    // user: "Neptune and Uranus need the cell structures initialized at the beginning too like Saturn").
+    // DEFAULT 0 (=1 turns it on). With =1: (a) the prescribed meridional cell v is KEPT under ATNEPT_GEO_BALANCE
+    // (ATNEPT_V_INIT_SCALE then defaults to 1 instead of 0; an explicit ATNEPT_V_INIT_SCALE still wins), and
+    // (b) after the initial damp_wiggles u is replaced by the radial branch that makes the cells divergence-free:
+    // for an axisymmetric incompressible flow  d(rm^2 sin u)/dr + d(rm sin v)/dtheta = 0, so with a
+    // streamfunction  rm^2 sin u = d psi/d theta,  rm sin v = - d psi/dr.  psi is integrated from v upward
+    // (trapezoid on rad.z, psi = 0 at i = 0); a column whose v does not integrate to zero is closed by a
+    // column-uniform return wind dv = psi(top) / (rm sin (r_top - r_0)), which also makes u = 0 at the lid.
+    // u central in theta, pole rows copy their neighbours; built on k = 0, copied to every longitude; w untouched.
+    // The TRUE sine is used, as on ATSAT; this model floors the metric sine in the RHS (ATNEPT_SINTHE_FLOOR),
+    // so poleward of the floor the cells are divergence-free in the true geometry only. Printed: max |u|,
+    // max |dv| and the interior continuity residual (true sine, k = 1) before / after.
+    static int cell_init(){
+        static const int v = [](){ const char* e = getenv("ATNEPT_CELL_INIT"); return e ? atoi(e) : 0; }();
+        return v;
+    }
+
+    static double continuityResidualMax(cNeptuneModel& m, int& i_m, int& j_m){
+        const int im = m.im, jm = m.jm;
+        double mx = 0.0; i_m = j_m = 0;
+        const int k = 1;
+        for(int i = 1; i < im-1; i++) for(int j = 1; j < jm-1; j++){
+            const double sinthe = sin(m.the.z[j]);
+            double costhe = cos(m.the.z[j]);
+            if(cNeptuneModel::costhe_abs() && j > 90) costhe = - costhe;
+            const double rm = m.metricRadius(m.rad.z[i]);
+            const double res = (m.u.x[i+1][j][k] - m.u.x[i-1][j][k]) / (2. * m.dr) + 2. * m.u.x[i][j][k] / rm
+                             + (m.v.x[i][j+1][k] - m.v.x[i][j-1][k]) / (2. * m.dthe) / rm + costhe / (rm * sinthe) * m.v.x[i][j][k];
+            if(fabs(res) > mx){ mx = fabs(res); i_m = i; j_m = j; }
+        }
+        return mx;
+    }
+
+    void cellStreamfunction()
+    {
+        const int im = m.im, jm = m.jm, km = m.km;
+        int i0_, j0_, i1_, j1_;
+        const double res0 = continuityResidualMax(m, i0_, j0_);
+        std::vector<double> psi((size_t)im * jm, 0.0), corr(jm, 0.0);
+        const double r_span = m.rad.z[im-1] - m.rad.z[0];
+        for(int j = 1; j < jm-1; j++){
+            const double sj = sin(m.the.z[j]);
+            double s_ = 0.0;
+            for(int i = 1; i < im; i++){
+                const double f0 = m.metricRadius(m.rad.z[i-1]) * sj * m.v.x[i-1][j][0], f1 = m.metricRadius(m.rad.z[i]) * sj * m.v.x[i][j][0];
+                s_ -= 0.5 * (f0 + f1) * (m.rad.z[i] - m.rad.z[i-1]);
+                psi[(size_t)i * jm + j] = s_;
+            }
+            corr[j] = psi[(size_t)(im-1) * jm + j];
+            for(int i = 0; i < im; i++) psi[(size_t)i * jm + j] -= corr[j] * (m.rad.z[i] - m.rad.z[0]) / r_span;
+        }
+        double u_mx = 0.0, dv_mx = 0.0;
+        std::vector<double> u_c((size_t)im * jm, 0.0), v_c((size_t)im * jm, 0.0);
+        for(int i = 0; i < im; i++){
+            const double rm = m.metricRadius(m.rad.z[i]);
+            for(int j = 1; j < jm-1; j++){
+                const double sj = sin(m.the.z[j]);
+                u_c[(size_t)i * jm + j] = (psi[(size_t)i * jm + j+1] - psi[(size_t)i * jm + j-1]) / (2. * m.dthe) / (rm * rm * sj);
+                const double dv = corr[j] / (rm * sj * r_span);
+                v_c[(size_t)i * jm + j] = m.v.x[i][j][0] + dv;
+                u_mx = std::max(u_mx, fabs(u_c[(size_t)i * jm + j])); dv_mx = std::max(dv_mx, fabs(dv));
+            }
+            u_c[(size_t)i * jm + 0] = u_c[(size_t)i * jm + 1];           u_c[(size_t)i * jm + jm-1] = u_c[(size_t)i * jm + jm-2];
+            v_c[(size_t)i * jm + 0] = m.v.x[i][0][0];                    v_c[(size_t)i * jm + jm-1] = m.v.x[i][jm-1][0];
+        }
+        #pragma omp parallel for collapse(2)
+        for(int i = 0; i < im; i++) for(int j = 0; j < jm; j++) for(int k = 0; k < km; k++){
+            m.u.x[i][j][k] = u_c[(size_t)i * jm + j];
+            m.v.x[i][j][k] = v_c[(size_t)i * jm + j];
+        }
+        const double res1 = continuityResidualMax(m, i1_, j1_);
+        printf("      ATNEPT: ATNEPT_CELL_INIT: u from the streamfunction of v, max |u| %.4f m/s, column return wind max |dv| %.4f m/s;"
+               " continuity residual (interior, k = 1, true sine) %.6f at (%d, %d) -> %.6f at (%d, %d)\n",
+               u_mx * m.u_0, dv_mx * m.u_0, res0, i0_, j0_, res1, i1_, j1_);
     }
 
 private:
