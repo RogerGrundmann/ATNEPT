@@ -145,7 +145,7 @@ public:
 
     // ATNEPT_CELL_INIT (2026-11-04, ported from ATSAT_CELL_INIT, InitVelocity_Sat.cpp initCellStreamfunction;
     // user: "Neptune and Uranus need the cell structures initialized at the beginning too like Saturn").
-    // DEFAULT 0 (=1 turns it on). With =1: (a) the prescribed meridional cell v is KEPT under ATNEPT_GEO_BALANCE
+    // DEFAULT 1 since 2026-11-04 (=0 restores u = 0 and the V_INIT_SCALE 0 start). With =1: (a) the prescribed meridional cell v is KEPT under ATNEPT_GEO_BALANCE
     // (ATNEPT_V_INIT_SCALE then defaults to 1 instead of 0; an explicit ATNEPT_V_INIT_SCALE still wins), and
     // (b) after the initial damp_wiggles u is replaced by the radial branch that makes the cells divergence-free:
     // for an axisymmetric incompressible flow  d(rm^2 sin u)/dr + d(rm sin v)/dtheta = 0, so with a
@@ -157,7 +157,7 @@ public:
     // so poleward of the floor the cells are divergence-free in the true geometry only. Printed: max |u|,
     // max |dv| and the interior continuity residual (true sine, k = 1) before / after.
     static int cell_init(){
-        static const int v = [](){ const char* e = getenv("ATNEPT_CELL_INIT"); return e ? atoi(e) : 0; }();
+        static const int v = [](){ const char* e = getenv("ATNEPT_CELL_INIT"); return e ? atoi(e) : 1; }();   // DEFAULT 1 since 2026-11-04 (user: "flip the ice giant defaults"; =0 restores)
         return v;
     }
 

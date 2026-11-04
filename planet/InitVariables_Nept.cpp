@@ -178,7 +178,7 @@ void cNeptuneModel::init_PressureDynamic(){
     // trapezoid in theta. The centrifugal term of rhs_v is 1e-4 of these and is left out.
     if(pdyn_geo() && metric_split()){
         const double scale_p = 1.0e5 / (r_mix * u_0 * u_0);
-        static const double sin_floor = [](){ const char* e = getenv("ATNEPT_SINTHE_FLOOR"); return e ? atof(e) : 0.4; }();
+        static const double sin_floor = [](){ const char* e = getenv("ATNEPT_SINTHE_FLOOR"); return e ? atof(e) : 0.0; }();   // DEFAULT 0 since 2026-11-04 (true sine as ATSAT; user: "use the true sine like ATSAT for Uranus and Neptune too", "flip the ice giant defaults"; =0.4 restores; satchk/cellinit_2026-11-04 NT0: 200 it stable, p_dyn +-1 bar)
         // ATNEPT_PDYN_GEO_EXACT (2026-10-14; default follows ATNEPT_GEO_BALANCE, 0 = the trapezoid): integrate so that the
         // centred difference rhs_v takes returns the integrand exactly at every integrated row,
         // p[j+1] = p[j-1] + 2 dthe G[j], seeded with the trapezoid's first step. The trapezoid's

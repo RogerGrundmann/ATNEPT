@@ -186,7 +186,7 @@ void cNeptuneModel::RungeKuttaNept(){
 
     // Precompute sin/cos tables — depend only on j.
     // sinthe is clamped to a minimum to prevent 1/sin²θ blow-up near the poles.
-    static const double sinthe_min = [](){ const char* e = getenv("ATNEPT_SINTHE_FLOOR"); return e ? atof(e) : 0.4; }();   // ATNEPT_SINTHE_FLOOR (2026-10-12): the hardcoded polar metric floor as a knob, default 0.4 = unchanged
+    static const double sinthe_min = [](){ const char* e = getenv("ATNEPT_SINTHE_FLOOR"); return e ? atof(e) : 0.0; }();   // DEFAULT 0 since 2026-11-04 (true sine as ATSAT; user: "use the true sine like ATSAT for Uranus and Neptune too", "flip the ice giant defaults"; =0.4 restores; satchk/cellinit_2026-11-04 NT0: 200 it stable, p_dyn +-1 bar)   // ATNEPT_SINTHE_FLOOR (2026-10-12): the hardcoded polar metric floor as a knob, default 0.4 = unchanged
     std::vector<double> sinthe_tbl(jm), costhe_tbl(jm);
     for(int j = 0; j < jm; j++){
         sinthe_tbl[j] = std::max(sinthe_min, std::abs(sin(the.z[j])));

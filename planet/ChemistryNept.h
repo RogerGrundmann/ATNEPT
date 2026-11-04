@@ -154,7 +154,7 @@ public:
         // Pass 1: compute jT_* and j_* (ordinary + thermal diffusion fluxes).
         // All writes go to jT_* and j_* at [i][j][k]; reads are from
         // neighbouring cells of t, h2s, nh3, nh4sh — no write-write races.
-        static const double sinthe_min = [](){ const char* e = getenv("ATNEPT_SINTHE_FLOOR"); return e ? atof(e) : 0.4; }();   // ATNEPT_SINTHE_FLOOR (2026-10-12): the hardcoded polar metric floor as a knob, default 0.4 = unchanged
+        static const double sinthe_min = [](){ const char* e = getenv("ATNEPT_SINTHE_FLOOR"); return e ? atof(e) : 0.0; }();   // DEFAULT 0 since 2026-11-04 (true sine as ATSAT; user: "use the true sine like ATSAT for Uranus and Neptune too", "flip the ice giant defaults"; =0.4 restores; satchk/cellinit_2026-11-04 NT0: 200 it stable, p_dyn +-1 bar)   // ATNEPT_SINTHE_FLOOR (2026-10-12): the hardcoded polar metric floor as a knob, default 0.4 = unchanged
 
         #pragma omp parallel for collapse(3) schedule(static)
         for(int k = k_first; k < km-1; k++){
