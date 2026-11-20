@@ -50,6 +50,7 @@ namespace{
     std::function<double(double)> default_lambda=[](double i)->double{return i;};
 }
 
+template<class M> class ProcessDiag;               // <TAG>_PROC_DIAG (shared ProcessDiag.h)
 class cNeptuneModel{
 
     // Shared physics/output templates (SHARED.md5, `make check-shared`). ATNEPT is the third
@@ -64,6 +65,7 @@ class cNeptuneModel{
     template<class M> friend class Radiation;
     template<class M> friend class BoundaryConditions;
     template<class M> friend class Turbulence;
+    template<class M> friend class ProcessDiag;
     template<class M> friend class Precipitation;
     friend class BC_Nept;
     friend class ChemistryNept;
