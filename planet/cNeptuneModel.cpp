@@ -425,7 +425,7 @@ void cNeptuneModel::Run(){
     damp_species_init(ch4_cloud);
     damp_species_init(ch4_ice);
 
-    // ATNEPT_NH4SH_EQ (default 0): build the NH4SH cloud as the equilibrium of the set-up NH3 / H2S
+    // ATNEPT_NH4SH_EQ (default 1 since 2026-11-22): build the NH4SH cloud as the equilibrium of the set-up NH3 / H2S
     // (parcel sweep, ChemistryNept::EquilibriumNH4SH) after the four set-up saturation adjustments.
     if(ChemistryNept::nh4sh_eq()) ChemistryNept(*this).EquilibriumNH4SH("init");
 
@@ -904,7 +904,7 @@ void cNeptuneModel::Run(){
                 ch4, ch4_cloud, ch4_ice);
 
             proc_.satadj_end();
-            // ATNEPT_NH4SH_EQ (default 0): the NH4SH equilibrium adjustment on the adjusted NH3 / H2S. Counted in
+            // ATNEPT_NH4SH_EQ (default 1 since 2026-11-22): the NH4SH equilibrium adjustment on the adjusted NH3 / H2S. Counted in
             // the TB / CWB stage "SaturationAdjustment" (the mark follows); PROC_DIAG books it as chemistry.
             if(ChemistryNept::nh4sh_eq()){ proc_.chem_begin(); ChemistryNept(*this).EquilibriumNH4SH("loop"); proc_.chem_end(); }
             // Must follow the saturation adjustments: it removes condensate in place.
