@@ -425,6 +425,9 @@ void cNeptuneModel::Run(){
     damp_species_init(ch4_cloud);
     damp_species_init(ch4_ice);
 
+    // ATNEPT_NH4SH_EQ (default 0): build the NH4SH cloud as the equilibrium of the set-up NH3 / H2S
+    // (parcel sweep, ChemistryNept::EquilibriumNH4SH) after the four set-up saturation adjustments.
+    if(ChemistryNept::nh4sh_eq()) ChemistryNept(*this).EquilibriumNH4SH("init");
 
     ChemistryNept(*this).ChemMassRateNept();
     ChemistryNept(*this).FluxLimiterNH4SH();
@@ -901,6 +904,9 @@ void cNeptuneModel::Run(){
                 ch4, ch4_cloud, ch4_ice);
 
             proc_.satadj_end();
+            // ATNEPT_NH4SH_EQ (default 0): the NH4SH equilibrium adjustment on the adjusted NH3 / H2S. Counted in
+            // the TB / CWB stage "SaturationAdjustment" (the mark follows); PROC_DIAG books it as chemistry.
+            if(ChemistryNept::nh4sh_eq()){ proc_.chem_begin(); ChemistryNept(*this).EquilibriumNH4SH("loop"); proc_.chem_end(); }
             // Must follow the saturation adjustments: it removes condensate in place.
             tb_mark(TB_SATADJ); cwb_mark(TB_SATADJ); bh_mark(BH_SATADJ);
             if(precip_enabled()){ proc_.precip_begin(); PrecipitationNept(*this).run(); proc_.precip_end(); }
@@ -916,6 +922,7 @@ void cNeptuneModel::Run(){
             // from the adjusted state; 2 copies the temperature too, so the latent heat goes with
             // the condensate. The in-place precipitation above is kept by it as well.
             static const int rk_scalar_sync = [](){ const char* e = getenv("ATNEPT_RK_SCALAR_SYNC"); return e ? atoi(e) : 2; }();
+            const bool nh4sh_sync_ = ChemistryNept::nh4sh_eq();
             if(rk_scalar_sync >= 1){
                 #pragma omp parallel for collapse(2) schedule(static)
                 for(int i = 0; i < im; i++){
@@ -934,6 +941,7 @@ void cNeptuneModel::Run(){
                             ch4_cloudn.x[i][j][k] = ch4_cloud.x[i][j][k];
                             ch4_icen.x[i][j][k]   = ch4_ice.x[i][j][k];
                             if(rk_scalar_sync >= 2) tn.x[i][j][k] = t.x[i][j][k];
+                            if(nh4sh_sync_) nh4shn.x[i][j][k] = nh4sh.x[i][j][k];   // ATNEPT_NH4SH_EQ writes NH4SH directly
                         }
                     }
                 }
@@ -1142,7 +1150,10 @@ void cNeptuneModel::Run(){
                   C_h2s, L0_h2s, R_h2s, del_alf_h2s, del_bet_h2s, C_h2s, L0_h2s, del_alf_h2s, del_bet_h2s, t_00_h2s },
                 { "CH4", &ch4, &ch4_cloud, &ch4_ice, ep_ch4, lv_ch4, ls_ch4, t_0_ch4,
                   C_ch4, L0_ch4, R_ch4, del_alf_ch4, del_bet_ch4, C_ch4_ice, L0_ch4_ice, del_alf_ch4_ice, del_bet_ch4_ice, t_00_ch4 } };
-            std::vector<Tr_> tracers = { { "NH4SH", &nh4sh, 0.0, true, 0.0 } };
+            // NH4SH carries its heat of formation in the conserved energy when ATNEPT_NH4SH_EQ forms it with that
+            // heat (ChemistryNept::EquilibriumNH4SH); the rate law releases none, so 0 (as before).
+            const double L_nh4sh_ = ChemistryNept::nh4sh_eq() ? ChemistryNept::nh4sh_formation_heat() : 0.0;
+            std::vector<Tr_> tracers = { { "NH4SH", &nh4sh, 0.0, true, L_nh4sh_ } };
             if(chrom_on()) tracers.push_back({ "chrom", &chrom, 0.0, false, 0.0 });   // ATNEPT_CHROM: mixed as ATJUP mixes it
             proc_.mca_begin();
             MoistConvectiveAdjustmentNept(*this, gases, tracers).run();
