@@ -79,13 +79,13 @@ public:
 
         // ATNEPT_NH4SH_EQ=1: the rate law contributes nothing (w_* = 0); the diffusion term stays.
         const bool eq_on = nh4sh_eq();
-        // ATNEPT_CHEM_DIFFLUX_PLUS (2026-11-23, row GIANTS-CHEM-DIFFLUX; DEFAULT 0 = the minus below, unchanged):
+        // ATNEPT_CHEM_DIFFLUX_PLUS (2026-11-23, row GIANTS-CHEM-DIFFLUX; DEFAULT 1 since 11-23, =0 = the old minus):
         // the sign of the diffusive term in massflux_*. ATSAT's ATSAT_CHEM_DIFFLUX_PLUS (SAT-CHEM-DIVERGE item 4,
         // ChemistrySat.h): Fick's tendency is +D lap(c), so massflux = w MINUS difflux anti-diffuses. Belongs
         // with ATNEPT_CHEM_DIFFLUX_LAPLACIAN=1 (DiffMassFluxNept); either alone is not the physical pair.
-        // dsign is +1.0 or -1.0, so the default path is the subtraction it always was, exactly.
+        // dsign is +1.0 or -1.0, so =0 is the subtraction it always was, exactly.
         static const double dsign = [](){
-            const char* e = getenv("ATNEPT_CHEM_DIFFLUX_PLUS"); return (e && atoi(e) != 0) ? 1.0 : -1.0; }();
+            const char* e = getenv("ATNEPT_CHEM_DIFFLUX_PLUS"); return (!e || atoi(e) != 0) ? 1.0 : -1.0; }();
 
         #pragma omp parallel for collapse(3) schedule(static)
         for(int k = k_first; k < km-1; k++){
@@ -297,8 +297,8 @@ public:
         using namespace std;
         cout << endl << "      ATNEPT: DiffMassFluxNept" << endl;
 
-        // ATNEPT_CHEM_DIFFLUX_LAPLACIAN (2026-11-23, row GIANTS-CHEM-DIFFLUX; DEFAULT 0 = the two-pass scalar below,
-        // unchanged): ATSAT's ATSAT_CHEM_DIFFLUX_LAPLACIAN (SAT-CHEM-DIVERGE item 4, default there since e7f77de).
+        // ATNEPT_CHEM_DIFFLUX_LAPLACIAN (2026-11-23, row GIANTS-CHEM-DIFFLUX; DEFAULT 1 since 11-23, =0 = the two-pass
+        // scalar below): ATSAT's ATSAT_CHEM_DIFFLUX_LAPLACIAN (SAT-CHEM-DIVERGE item 4, default there since e7f77de).
         // Pass 2 below is NOT a divergence: it sums the components of d(j)/dx as scalars, with |.| on the
         // theta part and no metric factors, and j_* carries the thermal-diffusion part jT ~ DT/T dT/dr, which
         // is nonzero where the species is ZERO -- so difflux_* creates NH3 and H2S out of nothing wherever
@@ -308,7 +308,7 @@ public:
         // =1: difflux_x = D_x * laplacian_spherical(c_x), the diffusive tendency (zero where c is uniform);
         // pair it with ATNEPT_CHEM_DIFFLUX_PLUS=1. j_* and thermalmassflux are computed as before either way.
         static const int difflux_laplacian = [](){
-            const char* e = getenv("ATNEPT_CHEM_DIFFLUX_LAPLACIAN"); return e ? atoi(e) : 0; }();
+            const char* e = getenv("ATNEPT_CHEM_DIFFLUX_LAPLACIAN"); return e ? atoi(e) : 1; }();
 
         auto begin = std::chrono::high_resolution_clock::now();
 
