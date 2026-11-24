@@ -38,10 +38,13 @@ void cNeptuneModel::init_temperature(){
             const bool anchor = t_init_anchor() != 0;
             const double T_bottom = anchor ? t_bottom_anchor_K() : T_top + gam * L_atm;   // K at i=0
 
+            std::vector<double> Tcp_;                                   // ATNEPT_CP_H2 / _CP_GAS (CpH2.h): the cp(T) column
+            if(CpH2::on<cNeptuneModel>()) cp_column(T_bottom, T_top, Tcp_);
             for(int i = 0; i < im; i++){
                 height = get_layer_height(i);                           // km
                 t.x[i][j][k] = (T_bottom - gam * height) / t_ref;
                 if(anchor) t.x[i][j][k] = std::max(T_bottom - gam * height, T_top) / t_ref;
+                if(CpH2::on<cNeptuneModel>()) t.x[i][j][k] = Tcp_[i] / t_ref;
 
 /*
     cout.precision(10);
@@ -368,6 +371,11 @@ void cNeptuneModel::init_PressureStatic(){
             const double h_trop   = (T_bottom - T_top) / gam;           // km, where the adiabat reaches T_top
             const double p_trop   = p_bottom * pow(T_top / T_bottom, exp_pressure);
 
+            if(CpH2::on<cNeptuneModel>()){                                         // ATNEPT_CP_H2 / _CP_GAS: the cp(T) column (as init_temperature
+                std::vector<double> Tcp_; cp_column(T_bottom, T_top, Tcp_);   // rewrites it here too) and p hydrostatic up it
+                for(int i = 0; i < im; i++) t.x[i][j][k] = Tcp_[i] / t_ref;
+                cp_hydro_p(j, k, p_bottom); continue;
+            }
             for(int i = 0; i < im; i++){
                 double height = get_layer_height(i);                    // km
                 t.x[i][j][k] = (T_bottom - gam * height) / t_ref;

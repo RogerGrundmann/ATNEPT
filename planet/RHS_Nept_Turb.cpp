@@ -285,6 +285,9 @@ void cNeptuneModel::RHSNept(int i, int j, int k, const CellGeometry& geo){
     double pressure_t = coeff_energy_p * scale_p
         * (u_ijk * dpdr + v_invrm * dpdthe + w_invrs * dpdphi);
 
+    // ATNEPT_CP_H2 / _CP_GAS (CpH2.h, default off): the pressure work heats with the local cp(T), not cp_mix
+    if(CpH2::dyn_on<cNeptuneModel>() && t.x[i][j][k] > 0.0) pressure_t *= cp_mix / CpH2::cp_lapse(*this, t.x[i][j][k] * t_ref);
+
     double transport_t = u_ijk * dtdr + v_invrm * dtdthe + w_invrs * dtdphi;
 
     // ATNEPT_METRIC_SPLIT=1: the metric term leaves rhs_u, p_hydro balances it (RungeKutta_Nept_Turb.cpp)
