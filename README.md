@@ -16,9 +16,9 @@ A 3-D circulation model of **Neptune's** atmosphere with methane and H₂S cloud
 | Neptune | **ATNEPT** (this repo) | 200 km, ~32 bar to 0.03-0.05 bar | CH₄, H₂S, NH₄SH, H₂O | the fastest winds in the Solar System, driven by internal heat |
 
 Neptune atmospheric general circulation model based on the numerical framework of the
-ATOM climate model. Solves the 3-D Navier-Stokes equations in a spherical shell extending
+[ATOM climate model](https://github.com/atom-model/ATOM). Solves the 3-D Navier-Stokes equations in a spherical shell extending
 from the deep H₂O / NH₃ / NH₄SH cloud decks up through the methane condensation layer
-that defines Neptune's visible disk.
+that defines Neptune's visible disk. Its precipitation scheme -- the COSMO three-category rain / snow / graupel scheme in the shared `Precipitation.h` -- comes from [ATOM_Precipitation](https://github.com/RogerGrundmann/ATOM_Precipitation), a development version of ATOM.
 
 Despite being the most distant planet in the Solar System and receiving roughly
 1/900th of Earth's solar flux, Neptune hosts the fastest sustained winds ever measured
