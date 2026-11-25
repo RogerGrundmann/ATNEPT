@@ -59,6 +59,12 @@ against j = jm − 2 in ParaView; theta-derivative scalars are wrapped in `std::
 inside `DiffMassFluxNept` so that pole-antisymmetric gradient components do not break
 the symmetry of the resulting flux scalars.
 
+### Cloud profiles vs Atreya
+
+![Cloud and ice densities vs Atreya's equilibrium cloud model](doc/overlay_Neptune_N1_1000.png)
+
+Neptune, arm N1 (the defaults of 2026-11-24, `ATNEPT_CP_H2` 1 + `_CP_GAS` 1, `satchk/cph2_2026-11-24`) at iteration 1000, against Atreya et al. 2020 Fig. 6 (case SN16_N5, S/N ~10x solar as in the set-up): H2S deck on Atreya's, CH4 cloud base ~1 bar (Atreya ~1.9). Condensate densities against temperature (left axis) and pressure (right axis) at three latitudes; liquid solid, ice dashed, NH4SH dotted; Atreya's ECCM shaded by pressure (bar = base) and as long dashes by temperature (x = base). Made with `python3 -I tools/cloudprofile_pv.py <zonal.vtk> --out <file.png>` (`--atreya <case>|none`, `--lat 0,45,75`); the set for all four giants is in `literature/cloudprofile_compare/` (outside the repo).
+
 ---
 
 ## Repository Layout
