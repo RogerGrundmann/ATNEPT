@@ -341,10 +341,10 @@ None of these stops a run; all of them affect what a result means.
    top of the domain at 15 bar rather than 0.025 bar. Photosphere numbers from such runs are
    measuring the ceiling of the grid.
 
-5. **The precipitation and turbulence modules are diagnostic-only here.** They fill their arrays and
-   nothing reads them back: `S_precip_*` reaches no RHS (`ATNEPT_TURB_COUPLING` defaults to 1.0 since 2026-11-01).
-   Switching either on changes plots, not physics. Radiation is no longer in this list — it can now
-   reach `rhs_t` through `ATNEPT_RAD_COUPLING`, which is off by default; see item 8.
+5. **Radiation is the one module that does not feed back by default.** Precipitation and turbulence
+   were diagnostic-only here once; both are coupled now: `ATNEPT_PRECIP_COUPLING` 1.0 since 2026-10-12
+   (latent heat into `rhs_t`, `S_precip_*` into the species equations) and `ATNEPT_TURB_COUPLING` 1.0
+   since 2026-11-01. `ATNEPT_RAD_COUPLING` can reach `rhs_t` but is 0.0 by default; see item 8.
 
 6. **The metric radius was corrected and made the default, and results before that commit are not
    comparable with results after it.** `rad.z` runs 1..2, so an unshifted metric put Neptune's
